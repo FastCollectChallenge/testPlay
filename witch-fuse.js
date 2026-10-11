@@ -305,14 +305,20 @@
   const SIGMA = 0.45, BONUS = 0.1; // SIGMA : étalement des résultats autour de la valeur des 4 pommes ; BONUS : petit avantage (+26 % de valeur)
   const priceOf = t => NEW_APPLES[t] ? NEW_APPLES[t].price : (BASE_PRICE[t] || 0);
 
-  function rollFuse(types) {
+  const FEE = 0.01; // coût de la fusion : 1 % de la valeur des pommes déposées
+  const feeOf = arr => Math.ceil(arr.reduce((s, t) => s + priceOf(t), 0) * FEE);
+
+  // [{ t: null (rien) | type, p: probabilité }, ...] pour les pommes actuellement dans la fuse
+  function oddsFor(types) {
     const ok = types.reduce((p, t) => p * (OK_CHANCE[t] ?? 1), 1);
-    if (Math.random() >= ok) return null; // rien
     const V = Math.log10(types.reduce((s, t) => s + priceOf(t), 0)) + BONUS;
-    const w = RESULTS.map(r => Math.exp(-Math.pow(Math.log10(priceOf(r)) - V, 2) / (2 * SIGMA * SIGMA)));
-    let x = Math.random() * w.reduce((a, b) => a + b, 0);
-    for (let i = 0; i < w.length; i++) { x -= w[i]; if (x <= 0) return RESULTS[i]; }
-    return RESULTS[0];
+    const w = RESULTS.map(r => Math.exp(-Math.pow(Math.log10(priceOf(r)) - V, 2) / (2 * SIGMA * SIGMA))), sum = w.reduce((a, b) => a + b, 0);
+    return [{ t: null, p: 1 - ok }, ...RESULTS.map((r, i) => ({ t: r, p: ok * w[i] / sum }))];
+  }
+  function rollFuse(types) {
+    let x = Math.random();
+    for (const o of oddsFor(types)) { x -= o.p; if (x < 0) return o.t; }
+    return null;
   }
 
   const fcss = document.createElement("style");
@@ -351,7 +357,11 @@
 
   function startFuse() {
     const a = acc(), arr = fuseArr();
-    if (busy || !dimReady || arr.length !== MAX) return;
+    if (busy || !dimReady) return;
+    if (arr.length !== MAX) return say("Put 4 apples in the fuse");
+    const fee = feeOf(arr);
+    if ((a.money || 0) < fee) return say("Not enough money");
+    a.money -= fee; // 1 % de la valeur des pommes déposées
     busy = true; go.style.display = "none"; slots.style.display = "none";
     const t = rollFuse(arr.slice());
     a.fuse = []; // les 4 pommes sont consommées
@@ -371,8 +381,48 @@
     }, 2400);
   }
   go.onclick = startFuse;
+  /* ---------- pommes + pourcentages au-dessus du titre, bouton = prix ---------- */
+  const icss = document.createElement("style");
+  icss.textContent = `#wf-info{position:absolute;left:0;right:0;bottom:calc(50vh + 40px + clamp(16px,3.6vw,44px) * 1.4);display:flex;flex-direction:column;align-items:center;gap:12px;pointer-events:none;z-index:1}
+  .wf-iapples{display:flex;gap:10px}
+  .wf-ia{width:58px;height:58px;border-radius:12px;border:2px dashed rgba(255,255,255,.35);background:rgba(10,4,20,.45);display:flex;align-items:center;justify-content:center}
+  .wf-ia.full{border-style:solid;border-color:rgba(255,255,255,.7)}
+  .wf-ia img{width:44px;height:44px;object-fit:contain}
+  .wf-odds{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:92vw}
+  .wf-chip{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 6px;border-radius:10px;background:rgba(10,4,20,.7);border:2px solid rgba(255,255,255,.22);font-size:9px;color:#fff}
+  .wf-chip.no{border-color:#c0392b}
+  .wf-chip img{width:26px;height:26px;object-fit:contain}
+  #wf-go.off,#wf-go.off:hover{background:#1c3d2a;color:#6f8f7c;cursor:not-allowed;animation:none}`;
+  document.head.appendChild(icss);
+  const info = document.createElement("div"); info.id = "wf-info";
+  info.innerHTML = '<div class="wf-iapples"></div><div class="wf-odds"></div>';
+  dim.appendChild(info);
+
+  let infoSig = null;
+  function renderInfo(arr) {
+    const sig = arr.join(","); if (s  ig === infoSig) return; infoSig = sig;
+    const ap = info.firstChild, od = info.lastChild; ap.innerHTML = ""; od.innerHTML = "";
+    for (let i = 0; i < MAX; i++) {
+      const s = document.createElement("div"); s.className = "wf-ia" + (arr[i] ? " full" : "");
+      if (arr[i]) { const im = new Image(); im.src = IMG_FRUITS[arr[i]]; im.alt = APPLE_NAMES[arr[i]]; im.draggable = false; s.appendChild(im); }
+      ap.appendChild(s);
+    }
+    if (!arr.length) return;
+    oddsFor(arr).forEach((o, i) => {
+      const p = o.p * 100; if (i && p < 0.05) return; // on cache les chances quasi nulles
+      const c = document.createElement("div"); c.className = "wf-chip" + (i ? "" : " no"); c.title = o.t ? APPLE_NAMES[o.t] : "Nothing";
+      const im = new Image(); im.src = o.t ? IMG_FRUITS[o.t] : NOTHING_IMG; im.draggable = false;
+      const tx = document.createElement("span"); tx.textContent = p > 0 && p < 0.1 ? "<0.1%" : p.toFixed(1) + "%";
+      c.append(im, tx); od.appendChild(c);
+    });
+  }
+
   setInterval(() => {
-    go.style.display = dimOpen && dimReady && !busy && fuseArr().length === MAX ? "block" : "none";
+    const arr = fuseArr(), fee = feeOf(arr), a = acc(), txt = "$" + fmtNum(fee);
+    renderInfo(arr);
+    go.style.display = dimOpen && !busy ? "block" : "none";
+    if (go.textContent !== txt) go.textContent = txt;
+    go.classList.toggle("off", arr.length !== MAX || !a || (a.money || 0) < fee);
     if (!dimOpen) res.style.display = "none";
   }, 150);
   })();
