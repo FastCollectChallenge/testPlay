@@ -400,7 +400,7 @@
 
   let infoSig = null;
   function renderInfo(arr) {
-    const sig = arr.join(","); if (s  ig === infoSig) return; infoSig = sig;
+    const sig = arr.join(","); if (sig === infoSig) return; infoSig = sig;
     const ap = info.firstChild, od = info.lastChild; ap.innerHTML = ""; od.innerHTML = "";
     for (let i = 0; i < MAX; i++) {
       const s = document.createElement("div"); s.className = "wf-ia" + (arr[i] ? " full" : "");
