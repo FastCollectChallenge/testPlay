@@ -1,1142 +1,604 @@
-<!DOCTYPE html> 
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fast Collect Challenge</title>
-    <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;700;900&family=Press+Start+2P&family=Source+Sans+3:wght@600&display=swap" rel="stylesheet">
-    <style>
-        * { font-family: 'Press Start 2P', cursive !important; font-synthesis: none; }
-        /* Le panneau des spawns garde la police normale */
-        #spawn-panel, #spawn-panel *, .admin-msg { font-family: 'Nunito', sans-serif !important; }
-        body { margin: 0; overflow: hidden; background-color: #000; font-weight: 500; user-select: none; }
-        canvas { display: block; width: 100vw; height: 100vh; }
-        
-        #score, #timer-display { position: absolute; color: white; font-size: 16px; font-weight: 900; z-index: 10; text-shadow: 2px 2px 4px black; display: none; }
-        #score { left: 20px; top: 20px; }
-        #timer-display { right: 20px; top: 20px; }
-        
-        #adventure-hud { position: absolute; left: 20px; top: 20px; display: none; z-index: 10; }
-        .hud-row { display: flex; align-items: center; gap: 15px; }
-        #open-inv-btn { background: #487eb0; color: white; border: 3px solid #fff; font-size: 10px; padding: 12px 20px; border-radius: 12px; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.4); transition: transform 0.2s, background 0.2s; font-weight: 700; }
-        #open-inv-btn:hover { transform: scale(1.05); background: #00a8ff; }
-        
-        /* Cadre d'argent cliquable et extensible */
-        .pinned-money { background: #f1c40f; color: #2c3e50; font-weight: 700; font-size: 12px; padding: 10px 22px; border-radius: 50px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid #fff; cursor: pointer; transition: transform 0.2s, width 0.2s, background-color 0.2s; min-width: 80px; text-align: center; }
-        .pinned-money:hover { transform: scale(1.08); background-color: #e1b12c; }
-
-        /* Styles des écrans d'interfaces overlays (Inventory & Shop) */
-        #inventory-screen, #shop-screen, #index-screen { position: fixed; top: 5vh; left: 5vw; width: 90vw; height: 90vh; background: rgba(0, 0, 0, 0.55); z-index: 1000; border-radius: 25px; border: 3px solid rgba(255,255,255,0.2); backdrop-filter: blur(8px); display: none; flex-direction: column; padding: 30px; box-sizing: border-box; color: white; }
-        .screen-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
-        .money-badge { background: #f1c40f; color: #2c3e50; font-weight: 700; font-size: 14px; padding: 10px 30px; border-radius: 50px; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        .close-screen-btn { background: #c23616; color: white; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 10px; }
-        .close-screen-btn:hover { background: #ea2027; }
-
-        /* Onglets pour l'inventaire */
-        .tabs-container { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab-btn { background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); color: white; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 10px; transition: background 0.2s; }
-        .tab-btn.active { background: #487eb0; border-color: #fff; }
-
-        #inventory-grid, #shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; overflow-y: auto; flex-grow: 1; padding-right: 10px; align-content: start; }
-        #index-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; overflow-y: auto; flex-grow: 1; padding-right: 10px; align-content: start; }
-        .index-item-card { background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 15px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        .index-item-img { width: 100%; max-width: 110px; aspect-ratio: 1 / 1; object-fit: contain; }
-        .index-item-img.locked { filter: brightness(0); opacity: 0.85; }
-        .index-item-name { font-size: 12px; font-weight: 700; text-align: center; color: #f5f6fa; }
-        .apple-rarity { font-size: 7px; font-weight: 900; text-align: center; margin-top: -7px; letter-spacing: .4px; }
-        .inv-item-details { display:flex; flex-direction:column; gap:4px; min-width:0; }
-        .inv-item-name { font-size:8px; line-height:1.5; overflow-wrap:anywhere; }
-        .inv-item-rarity { font-size:6px; font-weight:900; }
-        .rarity-common { color:#145A32; } .rarity-rare { color:#3498DB; } .rarity-epic { color:#B45BDE; }
-        .rarity-godly { background:linear-gradient(90deg,#ff4242,#ffb52e,#fff15a,#47e66b,#48a9ff,#b75cff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-        .rarity-secret { color:#000; -webkit-text-fill-color:#000; background:none; text-shadow:1px 0 #fff,-1px 0 #fff,0 1px #fff,0 -1px #fff,1px 1px #fff,-1px -1px #fff,1px -1px #fff,-1px 1px #fff; }
-        .rarity-admin { background:linear-gradient(90deg,#ff2626,#ffd21f); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-        
-        /* Cartes d'items */
-        .inv-item-card { background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255,255,255,0.15); border-radius: 25px; height: 90px; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; position: relative; overflow: hidden; transition: background 0.2s, border-color 0.2s; cursor: pointer; }
-        .inv-item-card:hover { background: rgba(255, 255, 255, 0.18); border-color: rgba(255,255,255,0.4); }
-        .inv-item-info { display: flex; align-items: center; gap: 15px; font-size: 14px; font-weight: 700; }
-        .inv-item-icon-img { width: 45px; height: 45px; object-fit: contain; }
-        .inv-item-count { font-size: 14px; color: #f5f6fa; }
-        
-        .sell-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%) scale(0); background: #c23616; border: none; width: 45px; height: 45px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; box-shadow: 0 3px 8px rgba(0,0,0,0.3); z-index: 5; }
-        .inv-item-card:hover .sell-btn { transform: translateY(-50%) scale(1); }
-        .sell-btn:hover { background: #ea2027; transform: translateY(-50%) scale(1.1) !important; }
-
-        /* Cartes de la boutique (Shop Cards) */
-        .shop-item-card { background: linear-gradient(135deg, #1e272e, #2f3640); border: 3px solid #487eb0; border-radius: 20px; height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; transition: border-color 0.2s; cursor: pointer; padding: 10px; box-sizing: border-box; }
-        .shop-item-card:hover { border-color: #00a8ff; }
-        .shop-item-visual { display: flex; flex-direction: column; align-items: center; justify-content: center; transition: filter 0.2s, opacity 0.2s; width: 100%; height: 100%; }
-        .shop-item-img { width: 65px; height: 65px; object-fit: contain; margin-bottom: 5px; }
-        .shop-item-duration { font-size: 10px; font-weight: 700; color: #dcdde1; }
-        .shop-item-title { font-size: 11px; font-weight: 900; color: #fff; margin-bottom: 2px; }
-        
-        /* Overlay du prix au survol du Shop */
-        .shop-item-price-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.2s; font-size: 12px; font-weight: 900; color: #f1c40f; pointer-events: none; }
-        .shop-item-card:hover .shop-item-visual { filter: blur(3px); opacity: 0.3; }
-        .shop-item-card:hover .shop-item-price-overlay { opacity: 1; }
-
-        /* Boite de dialogue customisée modale type Confirmation */
-        #custom-confirm-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); z-index: 5000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-        .confirm-box { background: #2f3640; border: 3px solid #487eb0; padding: 25px; border-radius: 20px; text-align: center; color: white; width: 350px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .confirm-msg { font-size: 11px; font-weight: 700; margin-bottom: 20px; line-height: 1.8; }
-        .confirm-actions { display: flex; justify-content: center; gap: 15px; }
-        .confirm-btn { padding: 10px 25px; border-radius: 8px; border: none; font-weight: 700; font-size: 10px; cursor: pointer; transition: background 0.2s; }
-        .confirm-btn.yes { background: #487eb0; color: white; }
-        .confirm-btn.yes:hover { background: #00a8ff; }
-        .confirm-btn.no { background: #c23616; color: white; }
-        .confirm-btn.no:hover { background: #ea2027; }
-
-        /* Reste du CSS existant inchangé */
-        #sell-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.2); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
-        .sell-box { background: #2f3640; border: 3px solid #487eb0; padding: 25px; border-radius: 20px; text-align: center; color: white; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .sell-box h3 { margin-top: 0; font-size: 11px; line-height: 1.6; font-weight: 700; }
-        .sell-input { width: 80%; padding: 10px; font-size: 12px; border-radius: 8px; border: 2px solid #487eb0; background: #222; color: white; text-align: center; font-weight: 700; margin-bottom: 5px; }
-        .sell-input:focus { border-color: #00a8ff; outline: none; }
-        .sell-hint { font-size: 8px; color: #dcdde1; font-style: italic; margin-bottom: 15px; display: block; }
-        .sell-actions { display: flex; justify-content: center; gap: 10px; }
-
-        #msg-container-top { position: fixed; top: 60px; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10000; pointer-events: none; }
-        #msg-container-bottom { position: fixed; bottom: 150px; left: 0; width: 100%; display: flex; flex-direction: column-reverse; align-items: center; z-index: 10000; pointer-events: none; }
-        .admin-msg { font-family: 'Nunito', sans-serif !important; font-size: 14px; font-weight: 700; text-align: center; text-shadow: 2px 2px 10px rgba(0,0,0,0.9); margin: 5px 0; width: 100%; }
-        .txt-violet { color: #A020F0; }
-        .rainbow-text { background: linear-gradient(to right, #ff9999, #ffcc99, #ffff99, #99ff99, #99ccff, #cc99ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; filter: drop-shadow(0px 0px 2px rgba(255,255,255,0.3)); }
-        .galaxy-text { background: linear-gradient(to right, #ffb3ff, #b3f0ff, #e6b3ff, #ffffff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; filter: drop-shadow(0px 0px 5px rgba(179,240,255,0.6)); }
-
-        .gradient-text { -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-shadow: none; display: inline-block; filter: drop-shadow(0px 0px 3px rgba(255,255,255,0.55)); }
-
-        /* Panneau des spawns (adventure) */
-        #spawn-panel { position: fixed; top: 20px; right: 20px; z-index: 10; display: none; background: rgba(0,0,0,0.55); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 6px 14px; color: white; font-weight: 700; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); pointer-events: none; }
-        .spawn-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 4px 0; }
-        .spawn-row + .spawn-row { border-top: 1px solid rgba(255,255,255,0.12); }
-        .spawn-label { color: #dcdde1; white-space: nowrap; }
-        .spawn-icons { display: flex; gap: 6px; min-width: 58px; justify-content: flex-end; }
-        .spawn-icons img { width: 26px; height: 26px; object-fit: contain; }
-        .spawn-empty { color: #7f8fa6; }
-
-        #hud-events { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: row-reverse; gap: 15px; z-index: 1000; }
-        .event-card { display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 12px; border: 2px solid #555; min-width: 80px; }
-        .img-container { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; position: relative; font-size: 40px; }
-        .img-container img { width: 100%; height: 100%; object-fit: contain; position: absolute; z-index: 2; border-radius: 5px; }
-        .event-timer { color: white; font-weight: 700; font-size: 12px; margin-top: 5px; }
-
-        #leave-game-btn { position: absolute; bottom: 20px; left: 20px; z-index: 20; background: #c23616; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 10px; border: 2px solid #fff; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.4); display: none; transition: background 0.2s; }
-        #leave-game-btn:hover { background: #ea2027; }
-
-        /* Page d'accueil Redesign : Noir et Jaune, Bords Jaunes */
-        #home-screen { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: #000000; border: 10px solid #f1c40f; z-index: 100; display: flex; flex-direction: column; box-sizing: border-box; }
-        #dvdCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
-        .home-content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; justify-content: center; }
-        .home-header { position: absolute; top: 0; left: 0; width: 100%; height: 140px; display: flex; align-items: center; padding: 0 40px; box-sizing: border-box; }
-        .logo-placeholder { font-size: 50px; background: rgba(241, 196, 15, 0.1); padding: 10px; border-radius: 12px; border: 2px dashed #f1c40f; position: absolute; left: 40px; }
-        .main-title { color: #f1c40f; font-family: 'Press Start 2P', cursive !important; font-size: 32px; line-height: 1.5; text-transform: uppercase; text-shadow: 4px 4px 0px #000; margin: 0 auto; text-align: center; white-space: nowrap; }
-
-        #account-settings-btn { position: absolute; right: 40px; top: 40px; background: #f1c40f; color: #000; border: 3px solid #f1c40f; width: 55px; height: 55px; border-radius: 15px; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s; z-index: 10; }
-        #account-settings-btn:hover { transform: scale(1.1); background: #f39c12; }
-
-        #account-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); z-index: 2500; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-        #account-panel { background: #2f3640; border: 3px solid #7ed6df; padding: 25px; border-radius: 20px; color: white; text-align: center; width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
-        #account-select { padding: 10px; font-size: 10px; border-radius: 8px; background: #222; color: white; border: 2px solid #7ed6df; font-weight: 700; width: 100%; margin-bottom: 15px; margin-top: 10px; }
-        .acc-btn { background: #487eb0; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 8px; margin: 3px; transition: background 0.2s; }
-        .acc-btn:hover { background: #00a8ff; }
-        .acc-btn.danger { background: #c23616; }
-        .acc-btn.danger:hover { background: #ea2027; }
-
-        .modes-container { display: flex; gap: 60px; margin-top: 10px; }
-        .mode-card { width: 320px; height: 220px; background: #000000; border: 4px solid #f1c40f; border-radius: 20px; color: #f1c40f; display: flex; justify-content: center; align-items: center; font-family: 'Press Start 2P', cursive !important; font-size: 20px; text-align: center; cursor: pointer; position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(241, 196, 15, 0.2); transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
-        .mode-card:hover { transform: translateY(-10px) scale(1.03); border-color: #f39c12; box-shadow: 0 15px 35px rgba(241, 196, 15, 0.5); }
-
-        .bottom-action-btn { position: absolute; bottom: 40px; width: 70px; height: 70px; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 6px 15px rgba(0,0,0,0.4); transition: transform 0.2s ease, background-color 0.2s ease; cursor: pointer; border: none; text-decoration: none; }
-        .bottom-action-btn:hover { transform: scale(1.1); }
-        .bottom-action-btn img { width: 42px; height: 42px; object-fit: contain; }
-        .discord-btn-left { left: 40px; background-color: #f1c40f; }
-        .discord-btn-left:hover { background-color: #f39c12; }
-        .discord-btn-left img { border-radius: 50%; }
-        
-        .inv-title-text { font-family: 'Press Start 2P', cursive !important; font-size: 18px; margin: 0; color: #487eb0; }
-
-        /* ===== Écran d'accueil responsive =====
-           --u vaut 1px pour une fenêtre de 1440x900 et suit la plus petite des deux
-           dimensions (largeur/hauteur), bornée entre 0.3px et 1.6px.
-           Logo, titre, boutons et textes sont tous exprimés en multiples de --u. */
-        #home-screen { --u: clamp(0.3px, min(0.06944vw, 0.1111vh), 1.6px); }
-
-        .home-header { height: calc(140 * var(--u)); padding: 0 calc(40 * var(--u)); }
-        .logo-placeholder { font-size: calc(50 * var(--u)); padding: calc(10 * var(--u)); border-radius: calc(12 * var(--u)); border-width: calc(2 * var(--u)); left: calc(40 * var(--u)); }
-        .main-title { font-size: calc(32 * var(--u)); text-shadow: calc(4 * var(--u)) calc(4 * var(--u)) 0 #000; }
-
-        #account-settings-btn { right: calc(40 * var(--u)); top: calc(40 * var(--u)); width: calc(55 * var(--u)); height: calc(55 * var(--u)); border-radius: calc(15 * var(--u)); border-width: calc(3 * var(--u)); font-size: calc(26 * var(--u)); }
-
-        .modes-container { gap: calc(60 * var(--u)); margin-top: calc(10 * var(--u)); }
-        .mode-card { width: calc(320 * var(--u)); height: calc(220 * var(--u)); border-width: calc(4 * var(--u)); border-radius: calc(20 * var(--u)); font-size: calc(20 * var(--u)); }
-
-        .bottom-action-btn { bottom: calc(40 * var(--u)); width: calc(70 * var(--u)); height: calc(70 * var(--u)); }
-        .bottom-action-btn img { width: calc(42 * var(--u)); height: calc(42 * var(--u)); }
-        .discord-btn-left { left: calc(40 * var(--u)); }
-
-        /* Bouton Leave : en haut à gauche, rond, contour pointillé jaune, logo -> "Leave?" au survol */
-        #leave-game-btn { position: fixed; top: 20px; left: 20px; bottom: auto; width: 64px; height: 64px; padding: 0; border-radius: 50%; background: transparent; border: 3px dotted #f1c40f; color: #f1c40f; box-shadow: none; align-items: center; justify-content: center; font-size: 28px; line-height: 1; transition: transform 0.2s, background 0.2s; }
-        #leave-game-btn:hover { background: rgba(241, 196, 15, 0.12); transform: scale(1.06); }
-        #leave-game-btn .leave-label { display: none; font-size: 9px; }
-        #leave-game-btn:hover .leave-icon { display: none; }
-        #leave-game-btn:hover .leave-label { display: inline; }
-
-        /* Boutons Inventory / Shop / Index : empilés au milieu gauche de l'écran, fond mauve clair, image -> nom au survol */
-        #side-buttons { position: fixed; left: 20px; top: 50%; transform: translateY(-50%); z-index: 10; display: flex; flex-direction: column; gap: 14px; }
-        .side-btn { width: 70px; height: 70px; padding: 0; background: #D9BFF2; border: none; border-radius: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.35); transition: transform 0.2s; }
-        .side-btn:hover { transform: scale(1.06); }
-        .side-btn img { width: 68%; height: 68%; object-fit: contain; display: block; }
-        .side-btn .side-btn-label { display: none; color: #2c1a45; font-size: 10px; text-align: center; }
-        .side-btn:hover img { display: none; }
-        .side-btn:hover .side-btn-label, .side-btn.no-img .side-btn-label { display: block; }
-
-        /* Argent : en bas à gauche, plus grand, vert clair, contour blanc */
-        #money-hud { position: fixed; left: 20px; bottom: 20px; z-index: 10; }
-        #money-display { color: #4ADE80; font-size: 48px; line-height: 1; -webkit-text-stroke: 2px #fff; paint-order: stroke fill; text-shadow: 0 0 6px rgba(0,0,0,0.35); }
-
-        /* Bouton paramètres : icône seule, sans contour ni remplissage */
-        #account-settings-btn { background: transparent; border: none; box-shadow: none; padding: 0; overflow: visible; }
-        #account-settings-btn:hover { background: transparent; }
-        #account-settings-btn img { width: 100%; height: 100%; object-fit: contain; display: block; }
-    </style>
-</head>
-<body>
-
-    <div id="home-screen">
-        <canvas id="dvdCanvas"></canvas>
-        <div class="home-content">
-            <div class="home-header">
-                <div class="logo-placeholder">🕹️</div> 
-                <h1 class="main-title">Fast Collect Challenge</h1>
-                <button id="account-settings-btn" onclick="openAccountModal()"><img src="https://cdn-icons-png.flaticon.com/512/5676/5676586.png" alt="Settings" onerror="this.replaceWith(document.createTextNode('⚙️'))"></button>
-            </div>
-            <div class="modes-container">
-                <div class="mode-card" onclick="startAdventure()">ADVENTURE<br>MODE</div>
-                <div class="mode-card" onclick="startGame()">ARCADE<br>MODE</div>
-            </div>
-            <a href="https://discord.gg/52UY26TBQF" target="_blank" class="bottom-action-btn discord-btn-left">
-                <img src="https://i.pinimg.com/originals/50/5c/7f/505c7fdb81893aa475d88543b6b93d61.jpg" alt="Discord">
-            </a>
-        </div>
-    </div>
-
-    <div id="account-modal">
-        <div id="account-panel">
-            <div style="font-weight: 700; font-size: 11px; color: #7ed6df;">👤 ADVENTURE ACCOUNTS</div>
-            <select id="account-select" onchange="switchAccount(this.value)"></select>
-            <div style="margin-bottom: 15px;">
-                <button class="acc-btn" onclick="createNewAccount()">+ New</button>
-                <button class="acc-btn" onclick="exportAccount()">📤 Export Key</button>
-                <button class="acc-btn" onclick="importAccount()">📥 Import Key</button>
-                <button class="acc-btn danger" onclick="deleteAccount()">🗑️ Delete</button>
-            </div>
-            <button class="acc-btn" style="background:#555; width:80%;" onclick="closeAccountModal()">Close</button>
-        </div>
-    </div>
-
-    <div id="score">Score: 0</div>
-    <div id="timer-display">Timer: 60</div>
-
-    <div id="spawn-panel">
-        <div class="spawn-row"><span class="spawn-label">Latest spawn</span><span class="spawn-icons" id="spawn-latest"></span></div>
-        <div class="spawn-row"><span class="spawn-label">Latest good spawn</span><span class="spawn-icons" id="spawn-latest-good"></span></div>
-        <div class="spawn-row"><span class="spawn-label">Best spawn</span><span class="spawn-icons" id="spawn-best"></span></div>
-    </div>
-    
-    <div id="adventure-hud">
-        <div id="money-hud">
-            <div id="money-display">$<span id="pinned-money-counter">0</span></div>
-        </div>
-    </div>
-
-    <div id="inventory-screen">
-        <div class="screen-header">
-            <div class="money-badge">$ <span id="inv-money-counter">0</span></div>
-            <h2 class="inv-title-text">INVENTORY</h2>
-            <button class="close-screen-btn" onclick="toggleInventory(false)">Close ✖</button>
-        </div>
-        <div class="tabs-container">
-            <button class="tab-btn active" id="tab-apples-btn" onclick="switchInventoryTab('apples')">Apples</button>
-            <button class="tab-btn" id="tab-potions-btn" onclick="switchInventoryTab('potions')">Luck Potions</button>
-        </div>
-        <div id="inventory-grid"></div>
-    </div>
-
-    <div id="shop-screen">
-        <div class="screen-header">
-            <div class="money-badge">$ <span id="shop-money-counter">0</span></div>
-            <h2 class="inv-title-text" style="color: #f1c40f;">🏪 SHOP</h2>
-            <button class="close-screen-btn" onclick="toggleShop(false)">Close ✖</button>
-        </div>
-        <div style="font-family: 'Press Start 2P', cursive !important; font-size: 16px; text-align: center; margin-bottom: 20px; color: #7ed6df;">Luck Potions</div>
-        <div id="shop-grid"></div>
-    </div>
-
-    <div id="index-screen">
-        <div class="screen-header">
-            <h2 class="inv-title-text" style="color: #f1c40f;">📖 INDEX</h2>
-            <button class="close-screen-btn" onclick="toggleIndex(false)">Close ✖</button>
-        </div>
-        <div id="index-grid"></div>
-    </div>
-
-    <div id="custom-confirm-modal">
-        <div class="confirm-box">
-            <div class="confirm-msg" id="custom-confirm-message">Message standard</div>
-            <div class="confirm-actions">
-                <button class="confirm-btn yes" id="custom-confirm-yes-btn">Yes</button>
-                <button class="confirm-btn no" id="custom-confirm-no-btn">No</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="sell-modal">
-        <div class="sell-box">
-            <h3 id="sell-title">Sell Apples</h3>
-            <input type="text" id="sell-quantity" class="sell-input" placeholder="Quantity">
-            <span class="sell-hint">Type "Max" to sell all</span>
-            <div class="sell-actions">
-                <button class="acc-btn" onclick="confirmTransaction()">Confirm</button>
-                <button class="acc-btn danger" onclick="closeSellModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="msg-container-top"></div>
-    <div id="msg-container-bottom"></div>
-    <div id="hud-events"></div>
-    
-    <button id="leave-game-btn" onclick="leaveGame()"><span class="leave-icon">🕹️</span><span class="leave-label">Leave?</span></button>
-    <div id="side-buttons">
-        <button id="inv-btn" class="side-btn" onclick="toggleInventory(true)"><img src="https://cdn-icons-png.flaticon.com/512/3313/3313637.png" alt="Inventory" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Inventory</span></button>
-        <button id="shop-btn" class="side-btn" onclick="toggleShop(true)"><img src="https://cdn-icons-png.flaticon.com/512/126/126122.png" alt="Shop" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Shop</span></button>
-        <button id="index-btn" class="side-btn" onclick="toggleIndex(true)"><img src="https://static.thenounproject.com/png/176559-200.png" alt="Index" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Index</span></button>
-    </div>
-    <canvas id="gameCanvas"></canvas>
-
-    <script>
-        const MY_CLIENT_ID = 'p_' + Math.random().toString(36).slice(2, 10);
-        const ably = new Ably.Realtime({ key: 'bZFMkw.u1oLTg:xhXyW5SeGGYAmDyoGjYDfkbodtDNkZcEMXw11__DDxM', clientId: MY_CLIENT_ID });
-        const channel = ably.channels.get('admin-commands');
-        // Presence : l'admin voit qui est connecté et dans quel mode ('menu' | 'arcade' | 'adventure')
-        function setMode(mode) {
-            try { channel.presence.update({ mode: mode }, function(err){ if (err) console.error('[Fast Collect] presence failed:', err.message || err); else console.log('[Fast Collect] presence OK as', MY_CLIENT_ID, '-', mode); }); } catch(e) { console.error(e); }
-        }
-        setMode('menu');
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
-        const dvdCanvas = document.getElementById("dvdCanvas");
-        const dvdCtx = dvdCanvas.getContext("2d");
-
-        // Format court des nombres : 1000 -> 1K, 1500 -> 1.5K, 1000000 -> 1M, 1B, 1T... (1 décimale, sans ".0" inutile)
-        const NUM_SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
-        function fmtNum(n) {
-            n = Number(n); if (!isFinite(n)) return String(n);
-            const sign = n < 0 ? '-' : ''; n = Math.abs(Math.floor(n));
-            if (n < 1000) return sign + n;
-            const last = NUM_SUFFIXES.length - 1; let tier = 0, v = n;
-            while (v >= 1000 && tier < last) { v /= 1000; tier++; }
-            v = Math.round(v * 10) / 10;
-            if (v >= 1000 && tier < last) { v = Math.round((v / 1000) * 10) / 10; tier++; } // 999.96K -> 1M
-            return sign + (Number.isInteger(v) ? v : v.toFixed(1)) + NUM_SUFFIXES[tier];
-        }
-
-        // Format court des durées : 45 -> "45s", 60 -> "1min", 179 -> "2m 59s", 3600 -> "1h", 5400 -> "1h 30m"
-        function fmtTime(s) {
-            s = Math.round(Number(s)); if (!isFinite(s) || s < 0) s = 0;
-            if (s < 60) return s + "s";
-            const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-            if (h > 0) {
-                let out = h + "h";
-                if (m > 0) out += " " + m + "m";
-                if (sec > 0) out += " " + sec + "s";
-                return out;
-            }
-            return sec === 0 ? (m + "min") : (m + "m " + sec + "s");
-        }
-
-        function resize() { 
-            canvas.width = window.innerWidth; canvas.height = window.innerHeight; 
-            dvdCanvas.width = window.innerWidth; dvdCanvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize); 
-
-        let timeLeft = 60, gameActive = false, score = 0, scoreMult = 1, appleMultiplier = 1;
-        let currentGameMode = "arcade";
-        let luckMultiplier = 1; 
-        let currentLuck = 0.05; 
-        let activeTimers = {}, player = { x: canvas.width / 2, y: canvas.height / 2 };
-        
-        const BASE_BALL_SPEED = 2.5 * 1.5; // vitesse de base (x1.5)
-        let ball = { x: 100, y: 100, speed: BASE_BALL_SPEED, baseSpeed: BASE_BALL_SPEED, emoji: "🏐" };
-        let apples = [];
-        let gameSpawnInterval = null;
-
-        let currentInventoryTab = "apples"; // Gestionnaire d'onglets courant ('apples' ou 'potions')
-
-        const IMG_FRUITS = {
-            red: "https://minecraft.wiki/images/Apple_JE3_BE3.png?3853a",
-            green: "https://media.forgecdn.net/avatars/thumbnails/1159/26/256/256/638727529052260282.png",
-            golden: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/5/54/Golden_Apple_JE2_BE2.png/revision/latest/thumbnail/width/360/height/360?cb=20200521041809",
-            diamond: "https://minecraft-max.net/upload/iblock/e00/t1ck3mvx35ipy8qck6de5vejzaul0ui4.png",
-            candy: "https://media.forgecdn.net/avatars/thumbnails/1126/504/256/256/638684252218093369.png",
-            lava: "https://static.wikia.nocookie.net/create_mod/images/1/1a/Honeyed_Apple.png/revision/latest?cb=20210413133617",
-            galaxy: "https://static.planetminecraft.com/files/image/minecraft/texture-pack/2024/103/18047006-pack_xl.webp",
-            dark: "https://static.wikia.nocookie.net/minecraftcreepypasta/images/2/28/The_Dark_Apple.png/revision/latest?cb=20180216141542",
-            salhini: "salhiniappelini.png",
-            bloodmoon: "https://static.planetminecraft.com/files/image/minecraft/data-pack/2020/297/13612020-redstone-apple_xl.webp",
-            moony: "https://aether.wiki.gg/images/Modern_White_Apple.png?e320e3"
-        };
-
-        Object.assign(IMG_FRUITS, {
-            cheezy: "Cheezy%20Apple.png", sand: "Sand%20Apple.png", amethyst: "Amethyst%20Apple.png",
-            sapphire: "sapphire.png", canneloni: "Canneloni%20Apple.png", rainbow: "Rainbow%20Apple.png", ice: "Ice%20Apple.png"
-        });
-        Object.assign(IMG_FRUITS, {
-        skull: "Skull%20Apple.png", poisoned: "Poisoned%20apple.png", frostfire: "Frostfire%20apple.png", elixir: "Elixir%20Apple.png",            corrupted: "Corrupted%20Apple.png", ghost: "Ghost%20Apple.png", pumpkini: "Pumpkin%20apple.png", sun: "Sun%20apple.png"
-        });
-        const NEW_APPLES = {
-            cheezy:    { field:'cheezyApples',    name:'Cheezy Apple',    price:5000,      chance:0.0004,     color:'#FFC93C', msg:'A Cheezy Apple spawned in your server!' },
-            sand:      { field:'sandApples',      name:'Sand Apple',      price:50000,     chance:0.0001,     color:'#E6C98A', msg:'A Sand Apple spawned in your server!' },
-            amethyst:  { field:'amethystApples',  name:'Amethyst Apple',  price:250000,    chance:0.00002,    color:'#9B59B6', msg:'An Amethyst Apple spawned in your server!' },
-            ice:       { field:'iceApples',       name:'Ice Apple',       price:600000,    chance:0.0000085,  color:'#A5F2F3', msg:'An Ice Apple spawned in your server!' },
-            sapphire:  { field:'sapphireApples',  name:'Sapphire Apple',  price:1250000,   chance:0.000004,   color:'#0F52BA', msg:'A Sapphire Apple spawned in your server!' },
-            rainbow:   { field:'rainbowApples',   name:'Rainbow Apple',   price:3000000,   chance:0.0000017,  color:'#ff66cc', msg:'A Rainbow Apple spawned in your server!', rainbow:true },
-            canneloni: { field:'canneloniApples',name:'Apple Canneloni', price:250000000, chance:0.00000002, color:'#E4572E', msg:'An Apple Canneloni spawned in your server!' }
-        };
-                Object.assign(NEW_APPLES, {
-            skull:     { field:'skullApples',     name:'Skull Apple',       price:20000,     chance:0, color:'#d9d9d9', msg:'A Skull Apple spawned in your server!' },
-            poisoned:  { field:'poisonedApples',  name:'Poisoned Apple',    price:70000,     chance:0, color:'#7bd94a', msg:'A Poisoned Apple spawned in your server!' },
-            frostfire: { field:'frostfireApples', name:'Frostfire Apple',   price:150000,    chance:0, color:'#5fd4ff', msg:'A Frostfire Apple spawned in your server!' },
-            elixir:    { field:'elixirApples',    name:'Elixir Apple',      price:275000,    chance:0, color:'#c06bff', msg:'An Elixir Apple spawned in your server!' },
-            corrupted: { field:'corruptedApples', name:'Corrupted Apple',   price:600000,    chance:0, color:'#8a1c4a', msg:'A Corrupted Apple spawned in your server!' },
-            ghost:     { field:'ghostApples',     name:'Ghost Apple',       price:2300000,   chance:0, color:'#e8f4ff', msg:'A Ghost Apple spawned in your server!' },
-            pumpkini:  { field:'pumpkiniApples',  name:'Pumpkini Appelini', price:32000000,  chance:0, color:'#ff8a1f', msg:'A Pumpkini Appelini spawned in your server!' },
-            sun:       { field:'sunApples',       name:'Sun Apple',         price:170000000, chance:0, color:'#ffd23f', msg:'A Sun Apple spawned in your server!' }
-        });
-        // Déclarées juste après NEW_APPLES pour être initialisées avant le chargement des comptes/HUD.
-        const APPLE_ORDER = ['red', 'green', 'golden', 'diamond', 'candy', 'lava', 'galaxy', 'dark', 'cheezy', 'moony', 'sand', 'amethyst', 'ice', 'salhini', 'sapphire', 'rainbow', 'bloodmoon', 'canneloni'];
-        APPLE_ORDER.push('skull', 'poisoned', 'frostfire', 'elixir', 'corrupted', 'ghost', 'pumpkini', 'sun');
-        const APPLE_NAMES = { red: 'Red Apple', green: 'Green Apple', golden: 'Golden Apple', diamond: 'Diamond Apple', candy: 'Candy Apple', lava: 'Lava Apple', galaxy: 'Galaxy Apple', dark: 'Dark Apple', moony: 'Moony Apple', salhini: 'Salhini Appelini', bloodmoon: 'Bloodmoon Apple' };
-        const APPLE_FIELDS = { red: 'redApples', green: 'greenApples', golden: 'goldenApples', diamond: 'diamondApples', candy: 'candyApples', lava: 'lavaApples', galaxy: 'galaxyApples', dark: 'darkApples', moony: 'moonyApples', salhini: 'salhiniApples', bloodmoon: 'bloodmoonApples' };
-        Object.keys(NEW_APPLES).forEach(k => { APPLE_NAMES[k] = NEW_APPLES[k].name; APPLE_FIELDS[k] = NEW_APPLES[k].field; });
-
-        function newAppleMsg(id) { const n = NEW_APPLES[id]; showAdvancedMsg(n.msg, 'bottom', n.rainbow ? {isRainbow:true} : {color:n.color}); }
-
-        const IMG_POTIONS = {
-            x2: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/7/72/Potion_of_Luck_JE3.png/revision/latest?cb=20230303160252",
-            x4: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/f/f0/Potion_of_Strength_JE3.png/revision/latest?cb=20230303163006",
-            x6: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/8b/Potion_of_the_Turtle_Master_JE3.png/revision/latest?cb=20230303170448",
-            x8: "https://media.forgecdn.net/avatars/thumbnails/506/717/256/256/637825834617503195.png",
-            x10: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/f/f8/Potion_of_Decay_BE2.png/revision/latest?cb=20191027040618"
-        };
-
-        // Cache des instances d'images Canvas pour optimiser les rendus
-        const IMAGES_CACHE = {};
-        Object.keys(IMG_FRUITS).forEach(k => { IMAGES_CACHE[k] = new Image(); IMAGES_CACHE[k].src = IMG_FRUITS[k]; });
-
-        const LUCK_IMAGES = { 2: "https://static.wikia.nocookie.net/stealabr/images/e/ea/2xLuck.webp", 4: "https://static.wikia.nocookie.net/stealabr/images/f/f1/4xLuck.webp", 6: "https://static.wikia.nocookie.net/stealabr/images/9/9e/Clover5.webp", 8: "https://static.wikia.nocookie.net/stealabr/images/7/76/CloverStack.png", 10: "https://static.wikia.nocookie.net/stealabr/images/f/fe/10x.png",
-            12: "https://static.wikia.nocookie.net/stealabr/images/f/fb/12x.png/revision/latest?cb=20251126182250",
-            15: "https://static.wikia.nocookie.net/stealabr/images/0/0a/15x.png/revision/latest/scale-to-width/360?cb=20251222183115",
-            20: "https://static.wikia.nocookie.net/stealabr/images/b/b7/20x_Luck.png/revision/latest/scale-to-width/360?cb=20260207171434",
-            25: "https://static.wikia.nocookie.net/stealabr/images/e/ea/25x_Luck.png/revision/latest/scale-to-width/360?cb=20260317140953",
-            30: "30x luck.png",
-            35: "https://static.wikia.nocookie.net/stealabr/images/9/96/35x_Luck.png/revision/latest/scale-to-width/360?cb=20260719014843" };
-
-        // Configuration du catalogue de la boutique
-        const SHOP_PRODUCTS = [
-            { id: "pot_x2_30", type: "x2", multiplier: 2, duration: 30, price: 1000 },
-            { id: "pot_x2_60", type: "x2", multiplier: 2, duration: 60, price: 1750 },
-            { id: "pot_x4_30", type: "x4", multiplier: 4, duration: 30, price: 2000 },
-            { id: "pot_x4_60", type: "x4", multiplier: 4, duration: 60, price: 3500 },
-            { id: "pot_x6_25", type: "x6", multiplier: 6, duration: 25, price: 3250 },
-            { id: "pot_x6_45", type: "x6", multiplier: 6, duration: 45, price: 7000 },
-            { id: "pot_x8_20", type: "x8", multiplier: 8, duration: 20, price: 4000 },
-            { id: "pot_x8_40", type: "x8", multiplier: 8, duration: 40, price: 7500 },
-            { id: "pot_x8_60", type: "x8", multiplier: 8, duration: 60, price: 10000 },
-            { id: "pot_x10_15", type: "x10", multiplier: 10, duration: 15, price: 4500 },
-            { id: "pot_x10_30", type: "x10", multiplier: 10, duration: 30, price: 7500 },
-            { id: "pot_x10_60", type: "x10", multiplier: 10, duration: 60, price: 15000 }
-        ];
-
-        let accounts = { "Default": { money: 0, redApples: 0, greenApples: 0, goldenApples: 0, diamondApples: 0, candyApples: 0, lavaApples: 0, galaxyApples: 0, darkApples: 0, salhiniApples: 0, bloodmoonApples: 0, moonyApples: 0, potions: {} } };
-        let currentAccountName = "Default";
-        let activeSellType = null; 
-
-        // Gestion de l'affichage textuel alternatif du HUD argent au survol
-        // Système de boite de dialogue modale personnalisée asynchrone (Yes/No)
-        function showCustomConfirm(message, callback) {
-            document.getElementById("custom-confirm-message").innerText = message;
-            const modal = document.getElementById("custom-confirm-modal");
-            modal.style.display = "flex";
-            
-            const cleanListeners = () => {
-                document.getElementById("custom-confirm-yes-btn").onclick = null;
-                document.getElementById("custom-confirm-no-btn").onclick = null;
-                modal.style.display = "none";
-            };
-
-            document.getElementById("custom-confirm-yes-btn").onclick = () => { cleanListeners(); callback(true); };
-            document.getElementById("custom-confirm-no-btn").onclick = () => { cleanListeners(); callback(false); };
-        }
-
-        function openAccountModal() { document.getElementById("account-modal").style.display = "flex"; }
-        function closeAccountModal() { document.getElementById("account-modal").style.display = "none"; }
-
-        // Dernière valeur valide connue par compte : si une valeur devient NaN, on la restaure au lieu de la mettre à 0
-        let lastGood = {};
-        function sanitizeAccount(acc, name) {
-            if (!acc || typeof acc !== 'object') return acc;
-            const fields = ['money','redApples','greenApples'];
-            Object.keys(acc).forEach(k => { if (/Apples$/.test(k) && !fields.includes(k)) fields.push(k); });
-            const good = name ? (lastGood[name] = lastGood[name] || {}) : {};
-            fields.forEach(f => {
-                if (Number.isFinite(acc[f])) good[f] = acc[f];
-                else acc[f] = Number.isFinite(good[f]) ? good[f] : 0;
-            });
-            return acc;
-        }
-
-        function loadAllAccounts() {
-            const savedAccounts = localStorage.getItem("fastCollect_accounts");
-            try { lastGood = JSON.parse(localStorage.getItem("fastCollect_lastGood") || "{}") || {}; } catch (e) { lastGood = {}; }
-            const savedActive = localStorage.getItem("fastCollect_activeAccount");
-            if (savedAccounts) {
-                let parsed = JSON.parse(savedAccounts);
-                Object.keys(parsed).forEach(k => {
-                    sanitizeAccount(parsed[k], k);
-                    if (parsed[k].goldenApples === undefined) parsed[k].goldenApples = 0;
-                    if (parsed[k].diamondApples === undefined) parsed[k].diamondApples = 0;
-                    if (parsed[k].candyApples === undefined) parsed[k].candyApples = 0;
-                    if (parsed[k].lavaApples === undefined) parsed[k].lavaApples = 0;
-                    if (parsed[k].galaxyApples === undefined) parsed[k].galaxyApples = 0;
-                    if (parsed[k].darkApples === undefined) parsed[k].darkApples = 0;
-                    if (parsed[k].salhiniApples === undefined) parsed[k].salhiniApples = 0;
-                    if (parsed[k].bloodmoonApples === undefined) parsed[k].bloodmoonApples = 0;
-                    if (parsed[k].moonyApples === undefined) parsed[k].moonyApples = 0;
-                    if (parsed[k].potions === undefined) parsed[k].potions = {};
-                    Object.values(NEW_APPLES).forEach(n => { if (parsed[k][n.field] === undefined) parsed[k][n.field] = 0; });
-                });
-                accounts = parsed;
-            }
-            if (savedActive && accounts[savedActive]) { currentAccountName = savedActive; } 
-            else { currentAccountName = Object.keys(accounts)[0] || "Default"; }
-            renderAccountSelect(); updateAdventureHUD();
-        }
-
-        function saveAllAccounts() {
-            Object.keys(accounts).forEach(n => sanitizeAccount(accounts[n], n));
-            try { localStorage.setItem("fastCollect_lastGood", JSON.stringify(lastGood)); } catch (e) {}
-            localStorage.setItem("fastCollect_accounts", JSON.stringify(accounts));
-            localStorage.setItem("fastCollect_activeAccount", currentAccountName);
-            updateAdventureHUD();
-        }
-
-        function renderAccountSelect() {
-            const select = document.getElementById("account-select");
-            select.innerHTML = "";
-            Object.keys(accounts).forEach(name => {
-                const opt = document.createElement("option"); opt.value = name; opt.innerText = name;
-                if(name === currentAccountName) opt.selected = true; select.appendChild(opt);
-            });
-        }
-
-        function createNewAccount() {
-            const name = prompt("Enter new account name:"); if(!name) return; const cleanName = name.trim(); if(cleanName === "") return;
-            if(accounts[cleanName]) { alert("This account name already exists!"); return; }
-            accounts[cleanName] = { money: 0, redApples: 0, greenApples: 0, goldenApples: 0, diamondApples: 0, candyApples: 0, lavaApples: 0, galaxyApples: 0, darkApples: 0, salhiniApples: 0, bloodmoonApples: 0, moonyApples: 0, potions: {} };
-            currentAccountName = cleanName; saveAllAccounts(); renderAccountSelect();
-        }
-        function switchAccount(name) { if(accounts[name]) { currentAccountName = name; saveAllAccounts(); } }
-        function deleteAccount() {
-            if(Object.keys(accounts).length <= 1) { alert("You must keep at least one active account!"); return; }
-            if(confirm(`Are you sure you want to permanently delete account "${currentAccountName}"?`)) {
-                delete accounts[currentAccountName]; currentAccountName = Object.keys(accounts)[0]; saveAllAccounts(); renderAccountSelect();
-            }
-        }
-        function exportAccount() {
-            const dataStr = JSON.stringify({ name: currentAccountName, data: accounts[currentAccountName] });
-            const token = btoa(unescape(encodeURIComponent(dataStr))); prompt("Copy your backup secure key:", token);
-        }
-        function importAccount() {
-            const token = prompt("Paste your backup secure key here:"); if(!token) return;
-            try {
-                const decodedStr = decodeURIComponent(escape(atob(token.trim()))); const parsed = JSON.parse(decodedStr);
-                if(parsed.name && parsed.data) {
-                    if(accounts[parsed.name]) { if(!confirm(`An account named "${parsed.name}" already exists here. Overwrite it?`)) return; }
-                    accounts[parsed.name] = sanitizeAccount(parsed.data, parsed.name); currentAccountName = parsed.name; saveAllAccounts(); renderAccountSelect(); alert("Account imported successfully!");
-                }
-            } catch(e) { alert("Error reading key. Make sure you copied the full string."); }
-        }
-
-        function switchInventoryTab(tabName) {
-            currentInventoryTab = tabName;
-            document.getElementById("tab-apples-btn").className = tabName === 'apples' ? "tab-btn active" : "tab-btn";
-            document.getElementById("tab-potions-btn").className = tabName === 'potions' ? "tab-btn active" : "tab-btn";
-            updateAdventureHUD();
-        }
-
-        function updateAdventureHUD() {
-            const activeData = accounts[currentAccountName] || { money: 0, redApples: 0, greenApples: 0, goldenApples: 0, diamondApples: 0, candyApples: 0, lavaApples: 0, galaxyApples: 0, darkApples: 0, salhiniApples: 0, bloodmoonApples: 0, moonyApples: 0, potions: {} };
-            sanitizeAccount(activeData, currentAccountName);
-            document.getElementById("inv-money-counter").innerText = fmtNum(activeData.money);
-            document.getElementById("shop-money-counter").innerText = fmtNum(activeData.money);
-            
-            document.getElementById("pinned-money-counter").innerText = fmtNum(activeData.money);
-            
-            const grid = document.getElementById("inventory-grid"); grid.innerHTML = "";
-
-            if (currentInventoryTab === "apples") {
-                const itemTypes = [
-                    { id: 'red', content: IMG_FRUITS.red, count: activeData.redApples },
-                    { id: 'green', content: IMG_FRUITS.green, count: activeData.greenApples },
-                    { id: 'golden', content: IMG_FRUITS.golden, count: activeData.goldenApples },
-                    { id: 'diamond', content: IMG_FRUITS.diamond, count: activeData.diamondApples },
-                    { id: 'candy', content: IMG_FRUITS.candy, count: activeData.candyApples },
-                    { id: 'lava', content: IMG_FRUITS.lava, count: activeData.lavaApples || 0 },
-                    { id: 'galaxy', content: IMG_FRUITS.galaxy, count: activeData.galaxyApples || 0 },
-                    { id: 'dark', content: IMG_FRUITS.dark, count: activeData.darkApples || 0 },
-                    { id: 'moony', content: IMG_FRUITS.moony, count: activeData.moonyApples || 0 },
-                    { id: 'salhini', content: IMG_FRUITS.salhini, count: activeData.salhiniApples || 0 },
-                    { id: 'bloodmoon', content: IMG_FRUITS.bloodmoon, count: activeData.bloodmoonApples || 0 },
-                    ...Object.keys(NEW_APPLES).map(id => ({ id, content: IMG_FRUITS[id], count: activeData[NEW_APPLES[id].field] || 0 }))
-                ];
-                itemTypes.forEach(item => {
-                    if (item.count > 0) {
-                        const card = document.createElement("div"); card.className = "inv-item-card";
-                        const rarity = appleRarity(item.id);
-                        card.innerHTML = `<div class="inv-item-info"><img src="${item.content}" class="inv-item-icon-img" /><div class="inv-item-details"><span class="inv-item-name">${APPLE_NAMES[item.id] || NEW_APPLES[item.id]?.name || item.id}</span>${rarity ? `<span class="inv-item-rarity ${rarity.cls}">${rarity.name}</span>` : ''}<span class="inv-item-count">x${fmtNum(item.count)}</span></div></div><button class="sell-btn" onclick="event.stopPropagation(); openSellModal('${item.id}')">💱</button>`;
-                        grid.appendChild(card);
-                    }
-                });
-            } else if (currentInventoryTab === "potions") {
-                SHOP_PRODUCTS.forEach(prod => {
-                    const count = activeData.potions[prod.id] || 0;
-                    if (count > 0) {
-                        const card = document.createElement("div"); card.className = "inv-item-card";
-                        card.onclick = () => usePotion(prod.id);
-                        card.innerHTML = `
-                            <div class="inv-item-info">
-                                <img src="${IMG_POTIONS[prod.type]}" class="inv-item-icon-img" />
-                                <div style="display:flex; flex-direction:column; gap:2px;">
-                                    <span style="font-size:10px; font-weight:900;">Luck x${prod.multiplier}</span>
-                                    <span style="font-size:8px; color:#aaa;">${prod.duration}s</span>
-                                </div>
-                                <span class="inv-item-count" style="margin-left:10px;">x${fmtNum(count)}</span>
-                            </div>
-                            <button class="sell-btn" onclick="event.stopPropagation(); sellPotion('${prod.id}')">💱</button>
-                        `;
-                        grid.appendChild(card);
-                    }
-                });
-            }
-        }
-
-        function toggleInventory(show) {
-            const invScreen = document.getElementById("inventory-screen");
-            if (show) { toggleShop(false); updateAdventureHUD(); invScreen.style.display = "flex"; gameActive = false; } 
-            else { invScreen.style.display = "none"; gameActive = true; update(); }
-        }
-
-        /* Fonctions de l'interface Boutique (Shop) */
-        function toggleShop(show) {
-            const shopScreen = document.getElementById("shop-screen");
-            if (show) { toggleInventory(false); toggleIndex(false); renderShopGrid(); shopScreen.style.display = "flex"; gameActive = false; } 
-            else { shopScreen.style.display = "none"; gameActive = true; update(); }
-        }
-
-        /* Fonctions de l'interface Index (pommes déjà obtenues) */
-        function toggleIndex(show) {
-            const indexScreen = document.getElementById("index-screen");
-            if (show) { toggleInventory(false); toggleShop(false); renderIndexGrid(); indexScreen.style.display = "flex"; gameActive = false; }
-            else { indexScreen.style.display = "none"; gameActive = true; update(); }
-        }
-
-        function appleRarity(type) {
-            if (type === 'red' || type === 'green') return { name:'Common', cls:'rarity-common' };
-            if (type === 'golden' || type === 'diamond') return { name:'Rare', cls:'rarity-rare' };
-            if (['candy','lava','galaxy','dark'].includes(type)) return { name:'Epic', cls:'rarity-epic' };
-            if (['cheezy','sand','skull','poisoned','frostfire'].includes(type)) return { name:'Godly Apple', cls:'rarity-godly' };
-            if (['amethyst','ice','sapphire','rainbow','canneloni','elixir','corrupted','ghost','pumpkini','sun'].includes(type)) return { name:'Secret', cls:'rarity-secret' };
-            if (type === 'salhini') return { name:'Admin', cls:'rarity-admin' };
-            return null;
-        }
-
-        function renderIndexGrid() {
-            const grid = document.getElementById("index-grid"); grid.innerHTML = "";
-            const activeData = accounts[currentAccountName] || {};
-            APPLE_ORDER.filter(type => type !== 'salhini').forEach(type => {
-                const discovered = (activeData.discovered && activeData.discovered[type]) || (activeData[APPLE_FIELDS[type]] > 0);
-                const rarity = appleRarity(type);
-                const card = document.createElement("div"); card.className = "index-item-card";
-                card.innerHTML = `<img class="index-item-img${discovered ? '' : ' locked'}" src="${IMG_FRUITS[type]}" alt="${APPLE_NAMES[type]}"><div class="index-item-name">${discovered ? APPLE_NAMES[type] : '???'}</div>${rarity ? `<div class="apple-rarity ${rarity.cls}">${rarity.name}</div>` : ''}`;
-                grid.appendChild(card);
-            });
-        }
-
-        function renderShopGrid() {
-            const grid = document.getElementById("shop-grid"); grid.innerHTML = "";
-            SHOP_PRODUCTS.forEach(prod => {
-                const card = document.createElement("div");
-                card.className = "shop-item-card";
-                card.onclick = () => buyPotion(prod);
-                card.innerHTML = `
-                    <div class="shop-item-visual">
-                        <span class="shop-item-title">Luck x${prod.multiplier}</span>
-                        <img src="${IMG_POTIONS[prod.type]}" class="shop-item-img" />
-                        <span class="shop-item-duration">${prod.duration}s</span>
-                    </div>
-                    <div class="shop-item-price-overlay">$${fmtNum(prod.price)}</div>
-                `;
-                grid.appendChild(card);
-            });
-        }
-
-        function buyPotion(product) {
-            const activeData = accounts[currentAccountName]; if (!activeData) return;
-            if (activeData.money < product.price) { alert("You don't have enough money to buy this potion!"); return; }
-            
-            showCustomConfirm("Are you sure you want to buy this potion?", (accepted) => {
-                if (accepted) {
-                    activeData.money -= product.price;
-                    if (!activeData.potions[product.id]) activeData.potions[product.id] = 0;
-                    activeData.potions[product.id]++;
-                    saveAllAccounts();
-                    renderShopGrid();
-                }
-            });
-        }
-
-        function sellPotion(potionId) {
-            const activeData = accounts[currentAccountName]; if (!activeData) return;
-            const currentStock = activeData.potions[potionId] || 0;
-            if (currentStock <= 0) return;
-
-            const product = SHOP_PRODUCTS.find(p => p.id === potionId); if (!product) return;
-            const paybackPrice = Math.floor(product.price * 0.8);
-
-            showCustomConfirm("Are you sure you want to sell this potion (You will only keep 80% of the price)?", (accepted) => {
-                if (accepted) {
-                    activeData.potions[potionId]--;
-                    activeData.money += paybackPrice;
-                    saveAllAccounts();
-                }
-            });
-        }
-
-        function usePotion(potionId) {
-            const activeData = accounts[currentAccountName]; if (!activeData) return;
-            const currentStock = activeData.potions[potionId] || 0;
-            if (currentStock <= 0) return;
-
-            const product = SHOP_PRODUCTS.find(p => p.id === potionId); if (!product) return;
-
-            showCustomConfirm("Are you sure you want to use this potion?", (accepted) => {
-                if (accepted) {
-                    activeData.potions[potionId]--;
-                    saveAllAccounts();
-                    
-                    // Application instantanée de l'effet de chance de la potion dans la partie
-                    luckMultiplier = product.multiplier;
-                    currentLuck = ((currentGameMode === "adventure") ? 0.20 : 0.05) * luckMultiplier;
-                    
-                    showAdvancedMsg(`You activated Potion ${product.multiplier}x luck!`, 'bottom', getLuckStyle(product.multiplier));
-                    startHudTimer('luck', LUCK_IMAGES[product.multiplier] || IMG_POTIONS[product.type], product.duration, "🍀", () => {
-                        luckMultiplier = 1;
-                        currentLuck = (currentGameMode === "adventure") ? 0.20 : 0.05;
-                    });
-                    toggleInventory(false);
-                }
-            });
-        }
-
-        function openSellModal(type) {
-            activeSellType = type; const inputField = document.getElementById("sell-quantity"); inputField.value = "";
-            const title = document.getElementById("sell-title");
-            if (type === 'red') title.innerText = "Sell Red Apples (+1$)";
-            else if (type === 'green') title.innerText = "Sell Green Apples (+3$)";
-            else if (type === 'golden') title.innerText = "Sell Golden Apples (+7$)";
-            else if (type === 'diamond') title.innerText = "Sell Diamond Apples (+15$)";
-            else if (type === 'candy') title.innerText = "Sell Candy Apples (+50$)";
-            else if (type === 'lava') title.innerText = "Sell Lava Apples (+200$)";
-            else if (type === 'galaxy') title.innerText = "Sell Galaxy Apples (+500$)";
-            else if (type === 'dark') title.innerText = "Sell Dark Apples (+1K$)";
-            else if (type === 'salhini') title.innerText = "Sell Salhini Appelini (+100M$)";
-            else if (type === 'bloodmoon') title.innerText = "Sell Bloodmoon Apple (+6.7M$)";
-            else if (type === 'moony') title.innerText = "Sell Moony Apple (+50K$)";
-            if (NEW_APPLES[type]) title.innerText = `Sell ${NEW_APPLES[type].name} (+${fmtNum(NEW_APPLES[type].price)}$)`;
-            document.getElementById("sell-modal").style.display = "flex";
-        }
-        function closeSellModal() { document.getElementById("sell-modal").style.display = "none"; activeSellType = null; }
-
-        function confirmTransaction() {
-            if (!activeSellType) return; const activeData = accounts[currentAccountName]; if (!activeData) return;
-            const inputVal = document.getElementById("sell-quantity").value.trim();
-            let currentStock = 0, unitPrice = 0;
-            if (activeSellType === 'red') { currentStock = activeData.redApples; unitPrice = 1; }
-            else if (activeSellType === 'green') { currentStock = activeData.greenApples; unitPrice = 3; }
-            else if (activeSellType === 'golden') { currentStock = activeData.goldenApples; unitPrice = 7; }
-            else if (activeSellType === 'diamond') { currentStock = activeData.diamondApples; unitPrice = 15; }
-            else if (activeSellType === 'candy') { currentStock = activeData.candyApples; unitPrice = 50; }
-            else if (activeSellType === 'lava') { currentStock = activeData.lavaApples || 0; unitPrice = 200; }
-            else if (activeSellType === 'galaxy') { currentStock = activeData.galaxyApples || 0; unitPrice = 500; }
-            else if (activeSellType === 'dark') { currentStock = activeData.darkApples || 0; unitPrice = 1000; }
-            else if (activeSellType === 'salhini') { currentStock = activeData.salhiniApples || 0; unitPrice = 100000000; }
-            else if (activeSellType === 'bloodmoon') { currentStock = activeData.bloodmoonApples || 0; unitPrice = 6666666; }
-            else if (activeSellType === 'moony') { currentStock = activeData.moonyApples || 0; unitPrice = 50000; }
-
-            if (NEW_APPLES[activeSellType]) { currentStock = activeData[NEW_APPLES[activeSellType].field] || 0; unitPrice = NEW_APPLES[activeSellType].price; }
-            let amountToSell = 0;
-            if (inputVal.toLowerCase() === 'max') { amountToSell = currentStock; } 
-            else {
-                let parsedInt = parseInt(inputVal); if (isNaN(parsedInt) || parsedInt <= 0) { alert("Please enter a valid amount or type 'Max'."); return; }
-                amountToSell = parsedInt > currentStock ? currentStock : parsedInt;
-            }
-            if (!Number.isFinite(amountToSell) || !Number.isFinite(unitPrice)) { alert("Invalid amount."); closeSellModal(); return; }
-            if (amountToSell <= 0) { alert("You don't have any apples of this kind to sell!"); closeSellModal(); return; }
-
-            if (activeSellType === 'red') activeData.redApples -= amountToSell;
-            else if (activeSellType === 'green') activeData.greenApples -= amountToSell;
-            else if (activeSellType === 'golden') activeData.goldenApples -= amountToSell;
-            else if (activeSellType === 'diamond') activeData.diamondApples -= amountToSell;
-            else if (activeSellType === 'candy') activeData.candyApples -= amountToSell;
-            else if (activeSellType === 'lava') activeData.lavaApples -= amountToSell;
-            else if (activeSellType === 'galaxy') activeData.galaxyApples -= amountToSell;
-            else if (activeSellType === 'dark') activeData.darkApples -= amountToSell;
-            else if (activeSellType === 'salhini') activeData.salhiniApples -= amountToSell;
-            else if (activeSellType === 'bloodmoon') activeData.bloodmoonApples -= amountToSell;
-            else if (activeSellType === 'moony') activeData.moonyApples -= amountToSell;
-
-            if (NEW_APPLES[activeSellType]) activeData[NEW_APPLES[activeSellType].field] -= amountToSell;
-            activeData.money += (amountToSell * unitPrice); saveAllAccounts(); closeSellModal(); updateAdventureHUD(); 
-        }
-
-        // Animation Pomme Géante style Logo DVD qui rebondit
-        let dvdApple = { x: 100, y: 100, dx: 4, dy: 4, size: 120 };
-        function updateDvdApple() {
-            if (gameActive) return;
-            dvdCtx.clearRect(0, 0, dvdCanvas.width, dvdCanvas.height);
-            
-            dvdApple.x += dvdApple.dx;
-            dvdApple.y += dvdApple.dy;
-
-            if (dvdApple.x + dvdApple.size / 2 >= dvdCanvas.width - 10 || dvdApple.x - dvdApple.size / 2 <= 10) {
-                dvdApple.dx = -dvdApple.dx;
-            }
-            if (dvdApple.y + dvdApple.size / 2 >= dvdCanvas.height - 10 || dvdApple.y - dvdApple.size / 2 <= 10) {
-                dvdApple.dy = -dvdApple.dy;
-            }
-
-            let imgObj = IMAGES_CACHE['red'];
-            if (imgObj && imgObj.complete && imgObj.naturalWidth > 0) {
-                try { dvdCtx.drawImage(imgObj, dvdApple.x - dvdApple.size / 2, dvdApple.y - dvdApple.size / 2, dvdApple.size, dvdApple.size); } catch (e) {}
-            }
-
-            requestAnimationFrame(updateDvdApple);
-        }
-
-        resize(); updateDvdApple(); loadAllAccounts();
-
-        function leaveGame() {
-            setMode('menu');
-            gameActive = false; if (gameSpawnInterval) { clearInterval(gameSpawnInterval); gameSpawnInterval = null; }
-            apples = []; ball.speed = ball.baseSpeed; luckMultiplier = 1; setSpawnPanel(false); if (currentGameMode === "adventure") { saveAllAccounts(); }
-            document.getElementById("home-screen").style.display = "flex";
-            document.getElementById("score").style.display = "none"; document.getElementById("timer-display").style.display = "none";
-            document.getElementById("adventure-hud").style.display = "none"; document.getElementById("leave-game-btn").style.display = "none"; document.getElementById("side-buttons").style.display = "none";
-            document.getElementById("inventory-screen").style.display = "none"; document.getElementById("shop-screen").style.display = "none"; document.getElementById("index-screen").style.display = "none";
-            updateDvdApple();
-        }
-
-        function startGame() {
-            currentGameMode = "arcade"; luckMultiplier = 1; currentLuck = 0.05; setSpawnPanel(false); setMode('arcade'); 
-            document.getElementById("home-screen").style.display = "none";
-            document.getElementById("score").style.display = "block"; document.getElementById("timer-display").style.display = "block";
-            document.getElementById("adventure-hud").style.display = "none"; document.getElementById("leave-game-btn").style.display = "flex"; document.getElementById("side-buttons").style.display = "none";
-            score = 0; timeLeft = 60; document.getElementById("score").innerText = "Score: " + fmtNum(score); document.getElementById("timer-display").innerText = "Timer: " + timeLeft;
-            gameActive = true; apples = []; ball.speed = ball.baseSpeed; 
-            
-            spawnApple(false, 5); 
-            
-            update(); countdown();
-            if (gameSpawnInterval) clearInterval(gameSpawnInterval);
-            gameSpawnInterval = setInterval(() => { if(gameActive && currentGameMode === "arcade") spawnApple(false, 1); }, 1000);
-        }
-
-        function startAdventure() {
-            currentGameMode = "adventure"; luckMultiplier = 1; currentLuck = 0.20; resetSpawnPanel(); setSpawnPanel(true); 
-            document.getElementById("home-screen").style.display = "none";
-            document.getElementById("score").style.display = "none"; document.getElementById("timer-display").style.display = "none";
-            document.getElementById("adventure-hud").style.display = "block"; document.getElementById("leave-game-btn").style.display = "flex"; document.getElementById("side-buttons").style.display = "flex";
-            updateAdventureHUD(); gameActive = true; apples = []; ball.speed = ball.baseSpeed; 
-            
-            spawnApple(false, 5); 
-            
-            update(); 
-            if (gameSpawnInterval) clearInterval(gameSpawnInterval);
-            gameSpawnInterval = setInterval(() => { if(gameActive && currentGameMode === "adventure") spawnApple(false, 1); }, 1000);
-            setMode('adventure');
-        }
-
-        channel.unsubscribe();
-        channel.subscribe((msg) => {
-            const d = msg.data; if (!gameActive) return; 
-            if (msg.name === 'luck') { 
-                luckMultiplier = d.mult; currentLuck = ((currentGameMode === "adventure") ? 0.20 : 0.05) * luckMultiplier;
-                showAdvancedMsg(`FelixRouge activated ${d.mult}x luck!`, 'bottom', getLuckStyle(d.mult)); 
-                startHudTimer('luck', LUCK_IMAGES[d.mult], d.time, "🍀", () => { luckMultiplier = 1; currentLuck = (currentGameMode === "adventure") ? 0.20 : 0.05; }); 
-            }
-
-            if (msg.name === 'customLuck') {
-                luckMultiplier = d.mult; currentLuck = ((currentGameMode === "adventure") ? 0.20 : 0.05) * luckMultiplier;
-                const luckUrl = "https://static.wikia.nocookie.net/stealabr/images/0/09/30x_Luck.webp/revision/latest/scale-to-width/360?cb=20260515140747";
-                if (LUCK_IMAGES[d.mult]) { showAdvancedMsg("FelixRouge activated " + d.mult + "x luck for " + fmtTime(d.time) + "!", 'bottom', getLuckStyle(d.mult)); }
-                else { showAdvancedMsg("<span style='color: #ff3838; font-weight: 900;'>FelixRouge</span> activated " + d.mult + "x luck for " + fmtTime(d.time) + "!", 'bottom', {color: 'white'}); }
-                startHudTimer('custom_luck', LUCK_IMAGES[d.mult] || luckUrl, d.time, "🍀", () => { luckMultiplier = 1; currentLuck = (currentGameMode === "adventure") ? 0.20 : 0.05; });
-            }
-
-            if (msg.name === 'customSpawn' && currentGameMode === "adventure") {
-                if (Array.isArray(d.targets) && !d.targets.includes(MY_CLIENT_ID)) return;
-                const appleType = d.type.toLowerCase(); spawnAppleAdmin(appleType, d.targets ? 1 : (d.count || 1));
-                if (appleType === 'lava') { showAdvancedMsg("<span style='color: #ff3838; font-weight: 900;'>FelixRouge</span> spawned a Lava Apple in your server!", 'bottom', {color: '#FF4D00'}); } 
-                else if (appleType === 'galaxy') { showAdvancedMsg("<span style='color: #ff3838; font-weight: 900;'>FelixRouge</span> spawned a Galaxy Apple in your server!", 'bottom', {isGalaxy: true}); } 
-                else if (appleType === 'dark') { showAdvancedMsg("<span style='color: #ff3838; font-weight: 900;'>FelixRouge</span> spawned a Dark Apple in your server!", 'bottom', {color: 'black'}); }
-                else if (appleType === 'salhini') { showAdvancedMsg("A Salhini Appelini spawned in your server!", 'bottom', {color: '#F5D7C3'}); }
-                else if (appleType === 'bloodmoon') { showAdvancedMsg("A Bloodmoon apple spawned in your server!", 'bottom', {color: '#8b0000'}); }
-                else if (NEW_APPLES[appleType]) { newAppleMsg(appleType); }
-                else if (appleType === 'moony') { showAdvancedMsg("A Moony Apple spawned in your server!", 'bottom', {stops: ['#BFC1C2', '#F8F8F8', '#9EA0A2', '#ECECEC']}); }
-            }
-
-            if (msg.name === 'greentime') { 
-                let oldL = currentLuck; currentLuck = 1.0; 
-                showAdvancedMsg(`FelixRouge activated <span class="txt-violet">Green time</span>!`, 'bottom', getGTStyle(d.time)); 
-                startHudTimer('gt', "https://static.vecteezy.com/system/resources/previews/016/733/263/non_2x/cute-illustration-of-a-green-apple-in-cartoon-style-on-isolated-background-vector.jpg", d.time, "🍏", () => { currentLuck = oldL; }); 
-            }
-            if (msg.name === 'doublepoints') { scoreMult = 2; appleMultiplier = 2; showAdvancedMsg(`FelixRouge activated <span class="txt-violet">Double Points</span>!`, 'bottom', {isRainbow: true}); startHudTimer('dp', "https://fridg-front.s3.amazonaws.com/media/CACHE/images/products/lot-de-2-pommes-fuji_fEa1aJa/8e7b583a2aa9503e79230ddfaf062316.jpg", d.time, "🍎", () => { scoreMult = 1; appleMultiplier = 1; }); }
-            
-            if (msg.name === 'spawn') { spawnAppleAdmin('green', d.count); showAdvancedMsg(`FelixRouge spawned ${d.count} Green Apples!`, 'bottom', getSStyle(d.count)); }
-            if (msg.name === 'spawnGolden' && currentGameMode === "adventure") { spawnAppleAdmin('golden', d.count); let gColor = '#ffff00'; if(d.count === 3) gColor = '#A020F0'; if(d.count === 5) gColor = '#000000'; showAdvancedMsg(`FelixRouge spawned ${d.count} Golden Apples!`, 'bottom', {color: gColor}); }
-            if (msg.name === 'spawnDiamond' && currentGameMode === "adventure") { spawnAppleAdmin('diamond', d.count); let dColor = '#ffff00'; if(d.count === 2) dColor = '#A020F0'; if(d.count === 3) dColor = '#000000'; showAdvancedMsg(`FelixRouge spawned ${d.count} Diamond Apples!`, 'bottom', {color: dColor}); }
-            if (msg.name === 'spawnCandy' && currentGameMode === "adventure") { spawnAppleAdmin('candy', d.count); showAdvancedMsg(`FelixRouge spawned ${d.count} Candy Apple!`, 'bottom', {isRainbow: true}); }
-            
-            if (msg.name === 'ballSpeed') { ball.baseSpeed = BASE_BALL_SPEED * d.mult; ball.speed = ball.baseSpeed; showAdvancedMsg(`FelixRouge set ball speed to x${d.mult}`, 'bottom', d.mult >= 2 ? {color:'black'} : {color:'white'}); }
-            if (msg.name === 'announce') showAdvancedMsg(d.text, 'top', {color: 'white'});
-            if (msg.name === 'clearLuck') { 
-                luckMultiplier = 1; currentLuck = (currentGameMode === "adventure") ? 0.20 : 0.05; scoreMult = 1; appleMultiplier = 1; 
-                Object.keys(activeTimers).forEach(id => { clearInterval(activeTimers[id].interval); let c = document.getElementById('event-'+id); if(c) c.remove(); delete activeTimers[id]; }); 
-            }
-            
-            if (msg.name === 'reset') {
-                ball.speed = ball.baseSpeed * 3; showAdvancedMsg("Ball Speed set to x3 due to imminent server reseting", 'bottom', {isRainbow: true}); let rTime = 5;
-                const containerTop = document.getElementById('msg-container-top'); const resetDiv = document.createElement('div'); resetDiv.className = 'admin-msg'; resetDiv.style.color = '#ff4757'; resetDiv.innerHTML = `⚠️SERVERS RESET IN ${rTime}s`; containerTop.appendChild(resetDiv);
-                let rInterval = setInterval(() => { rTime--; if(rTime <= 0) { clearInterval(rInterval); resetDiv.remove(); location.reload(); } else { resetDiv.innerHTML = `⚠️SERVERS RESET IN ${rTime}s`; } }, 1000);
-            }
-        });
-
-        function getLuckStyle(m) { if(m==2) return {color:'#32CD32'}; if(m==4) return {color:'#DAA520'}; if(m==6) return {color:'#DA70D6'}; if(m==8) return {isRainbow:true}; if(m==10) return {color:'black'};
-            if(m==12) return {stops:['#000000','#FFD700']};                 // noir et jaune
-            if(m==15) return {stops:['#FF2D2D','#32CD32']};                 // rouge et vert
-            if(m==20) return {color:'#FF69B4'};                             // rose
-            if(m==25) return {stops:['#32CD32','#32CD32','#FFD700']};       // 2x vert, 1x jaune
-            if(m==30) return {stops:['#FF2D2D','#FF8C00']};                 // rouge et orange
-            if(m==35) return {stops:['#1ECBE1','#1ECBE1','#F6D365']};       // 2x bleu plage, 1x jaune sable
-            return {color:'white'}; }
-        function getGTStyle(s) { if(s==5) return {color:'#32CD32'}; if(s==10) return {color:'#DAA520'}; if(s==15) return {color:'#DA70D6'}; if(s==20) return {isRainbow:true}; if(s==30) return {color:'black'}; return {color:'white'}; }
-        function getTStyle(s) { if(s==10) return {color:'#32CD32'}; if(s==15) return {color:'#DAA520'}; if(s==20) return {color:'#DA70D6'}; if(s>=30) return {isRainbow:true}; return {color:'white'}; }
-        function getSStyle(c) { if(c==3) return {color:'#DAA520'}; if(c==5) return {color:'#DA70D6'}; if(c==7) return {isRainbow:true}; if(c>=10) return {color:'black'}; return {color:'white'}; }
-
-        function showAdvancedMsg(html, pos, style) {
-            const container = document.getElementById(pos === 'top' ? 'msg-container-top' : 'msg-container-bottom');
-            const div = document.createElement('div'); div.className = 'admin-msg';
-            if(style.isRainbow) div.innerHTML = `<span class="rainbow-text">${html}</span>`;
-            else if(style.isGalaxy) div.innerHTML = `<span class="galaxy-text">${html}</span>`;
-            else if(style.stops) div.innerHTML = `<span class="gradient-text" style="background-image: linear-gradient(to right, ${style.stops.join(', ')});">${html}</span>`;
-            else { div.style.color = style.color; div.innerHTML = html; if(style.color === 'black' || style.color === '#000000') div.style.textShadow = "0px 0px 8px rgba(255,255,255,0.7)"; }
-            container.appendChild(div); setTimeout(() => div.remove(), 5000);
-        }
-
-        function startHudTimer(id, url, dur, fallbackEmoji, onE) {
-            let container = document.getElementById('hud-events'); if (activeTimers[id]) { activeTimers[id].remaining += dur; return; }
-            let card = document.createElement('div'); card.className = 'event-card'; card.id = 'event-' + id;
-            card.innerHTML = `<div class="img-container"><span>${fallbackEmoji}</span><img src="${url}" onerror="this.style.display='none'"></div><div class="event-timer" id="timer-${id}">${fmtTime(dur)}</div>`;
-            container.appendChild(card);
-            activeTimers[id] = { remaining: dur, interval: setInterval(() => {
-                activeTimers[id].remaining--;
-                if (activeTimers[id].remaining <= 0) { clearInterval(activeTimers[id].interval); card.remove(); delete activeTimers[id]; if(onE) onE(); }
-                else { let t = document.getElementById('timer-' + id); if(t) t.innerText = fmtTime(activeTimers[id].remaining); }
-            }, 1000)};
-        }
-
-        // ===== Panneau des spawns =====
-        // Ordre des pommes, de la moins bonne à la meilleure. "Good spawn" = lava ou plus.
-        const GOOD_SPAWN_MIN_RANK = APPLE_ORDER.indexOf('lava');
-        const LATEST_SPAWN_LIMIT = 2;      // "Latest spawn" : les 2 dernières pommes
-        const LATEST_GOOD_SPAWN_LIMIT = 1; // "Latest good spawn" : 1 seule pomme
-        const BEST_SPAWN_LIMIT = 1;        // "Best spawn" : 1 seule pomme
-        let spawnLog = { latest: [], latestGood: [], best: [] };
-
-        function appleRank(type) { return APPLE_ORDER.indexOf(type); }
-
-        function setSpawnPanel(show) { document.getElementById("spawn-panel").style.display = show ? "block" : "none"; }
-
-        function resetSpawnPanel() { spawnLog = { latest: [], latestGood: [], best: [] }; renderSpawnPanel(); }
-
-        function recordSpawn(type) {
-            const rank = appleRank(type); if (rank < 0) return;
-            spawnLog.latest = [type, ...spawnLog.latest].slice(0, LATEST_SPAWN_LIMIT);
-            if (rank >= GOOD_SPAWN_MIN_RANK) spawnLog.latestGood = [type, ...spawnLog.latestGood].slice(0, LATEST_GOOD_SPAWN_LIMIT);
-            // best spawn = lava ou plus ; à rang égal, le tri stable garde la pomme la plus récente devant
-            if (rank >= GOOD_SPAWN_MIN_RANK) spawnLog.best = [type, ...spawnLog.best].sort((a, b) => appleRank(b) - appleRank(a)).slice(0, BEST_SPAWN_LIMIT);
-            renderSpawnPanel();
-        }
-
-        function renderSpawnPanel() {
-            const fill = (id, list) => {
-                document.getElementById(id).innerHTML = list.length
-                    ? list.map(t => `<img src="${IMG_FRUITS[t]}" alt="${t}" title="${t}">`).join('')
-                    : '<span class="spawn-empty">-</span>';
-            };
-            fill('spawn-latest', spawnLog.latest);
-            fill('spawn-latest-good', spawnLog.latestGood);
-            fill('spawn-best', spawnLog.best);
-        }
-
-        function spawnAppleAdmin(type, count) {
-            if(!gameActive) return;
-            let size = (type === 'green') ? 25 : 32; if(type === 'red') size = 25;
-            for(let i=0; i<count; i++) { apples.push({ x: Math.random() * (canvas.width - 60), y: Math.random() * (canvas.height - 60), size: size, type: type }); if (currentGameMode === "adventure") recordSpawn(type); }
-        }
-
-        function spawnApple(fG, c) {
-            if(!gameActive) return;
-            for(let i=0; i<c; i++) {
-                if (currentGameMode === "arcade") {
-                    let isOp = fG || Math.random() < currentLuck;
-                    apples.push({ x: Math.random() * (canvas.width - 60), y: Math.random() * (canvas.height - 60), size: 25, type: isOp ? 'green' : 'red' });
-                } 
-                else if (currentGameMode === "adventure") {
-                    let newType = null;
-                    // Chaque pomme rare fait son propre tirage : une chance élevée ne bloque plus
-                    // toutes les autres pommes derrière Cheezy dans l'ordre de la liste.
-                    if (!fG) {
-                        const eligible = Object.keys(NEW_APPLES).filter(id => Math.random() < Math.min(1, NEW_APPLES[id].chance * luckMultiplier));
-                        if (eligible.length) newType = eligible[Math.floor(Math.random() * eligible.length)];
-                    }
-                    if (newType) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: newType }); newAppleMsg(newType); recordSpawn(newType); continue; }
-                    let rng = Math.random();
-                    let bloodmoonChance = 0.00000666 * luckMultiplier;
-                    let darkChance = 0.001 * luckMultiplier;
-                    let salhiniChance = 0; // Salhini : admin only
-                    let moonyChance = 0.0001 * luckMultiplier;
-                    let galaxyChance = 0.003 * luckMultiplier;
-                    let lavaChance = 0.005 * luckMultiplier;
-                    let candyChance = 0.01 * luckMultiplier;
-                    let diamondChance = 0.05 * luckMultiplier;
-                    let goldenChance = 0.10 * luckMultiplier;
-
-                    if (!fG && rng < bloodmoonChance) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 36, type: 'bloodmoon' }); showAdvancedMsg("A Bloodmoon apple spawned in your server!", 'bottom', {color: '#8b0000'}); }
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'salhini' }); showAdvancedMsg("A Salhini Appelini spawned in your server!", 'bottom', {color: '#F5D7C3'}); }
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'moony' }); showAdvancedMsg("A Moony Apple spawned in your server!", 'bottom', {stops: ['#BFC1C2', '#F8F8F8', '#9EA0A2', '#ECECEC']}); }
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'dark' }); } 
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'galaxy' }); } 
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'lava' }); } 
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance + candyChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'candy' }); } 
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance + candyChance + diamondChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'diamond' }); } 
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance + candyChance + diamondChance + goldenChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'golden' }); } 
-                    else {
-                        let isOp = fG || Math.random() < currentLuck;
-                        apples.push({ x: Math.random() * (canvas.width - 60), y: Math.random() * (canvas.height - 60), size: 25, type: isOp ? 'green' : 'red' });
-                    }
-                    recordSpawn(apples[apples.length - 1].type);
-                }
-            }
-        }
-
-        function update() {
-            if(!gameActive) return; ctx.clearRect(0, 0, canvas.width, canvas.height);
-            let dx = player.x - ball.x, dy = player.y - ball.y, dist = Math.sqrt(dx*dx+dy*dy);
-            if(dist > 35) { ball.x += (dx/dist)*ball.speed; ball.y += (dy/dist)*ball.speed; }
-            
-            const maxBallSpeed = Math.max(5, ball.baseSpeed); if (ball.speed > maxBallSpeed) { ball.speed = maxBallSpeed; } else if (ball.speed < 1) { ball.speed = 1; }
-
-            ctx.shadowBlur = 0; ctx.shadowColor = "transparent"; ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 40px Nunito"; ctx.textAlign = "center"; 
-            ctx.fillText("🕹️", player.x, player.y); ctx.fillText(ball.emoji, ball.x, ball.y);
-            
-            apples = apples.filter(a => {
-                let hitBox = a.size;
-                if(Math.sqrt((ball.x-a.x)**2 + (ball.y-a.y)**2) < hitBox) {
-                    
-                    if (currentGameMode === "arcade") {
-                        score += (a.type === 'green' ? 3 : 1) * scoreMult; document.getElementById("score").innerText = "Score: " + fmtNum(score);
-                    } 
-                    else if(currentGameMode === "adventure") {
-                        let activeData = accounts[currentAccountName];
-                        if(activeData) {
-                            activeData.discovered = activeData.discovered || {}; activeData.discovered[a.type] = true;
-                            if(a.type === 'red') activeData.redApples += appleMultiplier;
-                            else if(a.type === 'green') activeData.greenApples += appleMultiplier;
-                            else if(a.type === 'golden') activeData.goldenApples += appleMultiplier;
-                            else if(a.type === 'diamond') activeData.diamondApples += appleMultiplier;
-                            else if(a.type === 'candy') activeData.candyApples += appleMultiplier;
-                            else if(a.type === 'lava') activeData.lavaApples = (activeData.lavaApples || 0) + appleMultiplier;
-                            else if(a.type === 'galaxy') activeData.galaxyApples = (activeData.galaxyApples || 0) + appleMultiplier;
-                            else if(a.type === 'dark') activeData.darkApples = (activeData.darkApples || 0) + appleMultiplier;
-                            else if(a.type === 'salhini') activeData.salhiniApples = (activeData.salhiniApples || 0) + appleMultiplier;
-                            else if(a.type === 'bloodmoon') activeData.bloodmoonApples = (activeData.bloodmoonApples || 0) + appleMultiplier;
-                            else if(a.type === 'moony') activeData.moonyApples = (activeData.moonyApples || 0) + appleMultiplier;
-                            else if(NEW_APPLES[a.type]) activeData[NEW_APPLES[a.type].field] = (activeData[NEW_APPLES[a.type].field] || 0) + appleMultiplier;
-                            saveAllAccounts();
-                        }
-                    }
-
-                    return false;
-                }
-                
-                // Dessin des halos (Glow effect) pour les pommes spéciales
-                ctx.save();
-                if (a.type === 'salhini') {
-                    ctx.shadowBlur = 20;
-                    ctx.shadowColor = "rgba(236, 232, 225, 0.9)";
-                } else if (a.type === 'bloodmoon') {
-                    ctx.shadowBlur = 25;
-                    ctx.shadowColor = "rgba(139, 0, 0, 1)";
-                } else if (a.type === 'moony') {
-                    ctx.shadowBlur = 20;
-                    ctx.shadowColor = "rgba(255, 255, 255, 0.85)";
-                }
-
-                if (NEW_APPLES[a.type]) {
-                    ctx.shadowBlur = 22;
-                    ctx.shadowColor = a.type === 'rainbow' ? `hsl(${(Date.now() / 5) % 360},100%,60%)` : NEW_APPLES[a.type].color;
-                }
-                let imgObj = IMAGES_CACHE[a.type];
-                if (imgObj && imgObj.complete && imgObj.naturalWidth > 0) {
-                    try { ctx.drawImage(imgObj, a.x - a.size/2, a.y - a.size/2, a.size, a.size); }
-                    catch (e) { ctx.font = "24px Nunito"; ctx.fillText("✨", a.x, a.y); }
-                } else { ctx.font = "24px Nunito"; ctx.fillText("✨", a.x, a.y); }
-                ctx.restore();
-                return true;
-            });
-            requestAnimationFrame(update);
-        }
-
-        function countdown() {
-            if(!gameActive || currentGameMode !== "arcade") return;
-            if (timeLeft > 0) { timeLeft--; document.getElementById("timer-display").innerText = "Timer: " + timeLeft; setTimeout(countdown, 1000); }
-            else { 
-                gameActive = false; if (gameSpawnInterval) { clearInterval(gameSpawnInterval); gameSpawnInterval = null; }
-                setTimeout(() => { if(confirm("Game Over! Restart?")) { startGame(); } else { leaveGame(); } }, 100); 
-            }
-        }
-
-        window.addEventListener("mousemove", (e) => { player.x = e.clientX; player.y = e.clientY; });
-    </script>
-<script src="i18n.js"></script>
-<script src="witch-fuse.js"></script>
-<script type="module" src="firebase-trade.js"></script>
-</body>
-</html>
-</body>
-</html>
+// firebase-trade.js : comptes Firebase + sauvegarde cloud + Trade (boîte aux lettres)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, GithubAuthProvider, linkWithCredential, signInWithCredential } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, runTransaction, collection, query, where, onSnapshot,
+  addDoc, updateDoc, serverTimestamp, getDocs, documentId, limit, deleteField, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyDVkJX-VibTIhMp_WoTqQ6LzNOy7G5OwmY",
+  authDomain: "fast-collect-challenge.firebaseapp.com",
+  projectId: "fast-collect-challenge",
+  storageBucket: "fast-collect-challenge.firebasestorage.app",
+  messagingSenderId: "357477145806",
+  appId: "1:357477145806:web:61e4d434124a461343849f"
+});
+const auth = getAuth(app), db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const FAKE = "@fastcollect.app";
+const LOGO = "https://raw.githubusercontent.com/FastCollectChallenge/play/main/Fast%20Collect%20Challenge%20Ingame%20logo.png";
+const clean = s => (s || "").trim().toLowerCase();
+const okName = s => /^[a-z0-9_]{3,16}$/.test(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const T = s => (window.T ? window.T(s) : s);
+// Ce module ES ne peut pas lire les const du script classique index.html.
+const APPLE_FIELDS = { red:'redApples', green:'greenApples', golden:'goldenApples', diamond:'diamondApples', candy:'candyApples', lava:'lavaApples', galaxy:'galaxyApples', dark:'darkApples', moony:'moonyApples', salhini:'salhiniApples', bloodmoon:'bloodmoonApples', cheezy:'cheezyApples', sand:'sandApples', amethyst:'amethystApples', ice:'iceApples', sapphire:'sapphireApples', rainbow:'rainbowApples', canneloni:'canneloniApples' };
+const APPLE_NAMES = { red:'Red Apple', green:'Green Apple', golden:'Golden Apple', diamond:'Diamond Apple', candy:'Candy Apple', lava:'Lava Apple', galaxy:'Galaxy Apple', dark:'Dark Apple', moony:'Moony Apple', salhini:'Salhini Appelini', bloodmoon:'Bloodmoon Apple', cheezy:'Cheezy Apple', sand:'Sand Apple', amethyst:'Amethyst Apple', ice:'Ice Apple', sapphire:'Sapphire Apple', rainbow:'Rainbow Apple', canneloni:'Apple Canneloni' };
+Object.keys(NEW_APPLES).forEach(k => { APPLE_FIELDS[k] = NEW_APPLES[k].field; APPLE_NAMES[k] = NEW_APPLES[k].name; });
+const SHOP_PRODUCTS = [{id:'pot_x2_30',multiplier:2,duration:30},{id:'pot_x2_60',multiplier:2,duration:60},{id:'pot_x4_30',multiplier:4,duration:30},{id:'pot_x4_60',multiplier:4,duration:60},{id:'pot_x6_25',multiplier:6,duration:25},{id:'pot_x6_45',multiplier:6,duration:45},{id:'pot_x8_20',multiplier:8,duration:20},{id:'pot_x8_40',multiplier:8,duration:40},{id:'pot_x8_60',multiplier:8,duration:60},{id:'pot_x10_15',multiplier:10,duration:15},{id:'pot_x10_30',multiplier:10,duration:30}];
+const toast = m => showAdvancedMsg(T(m), "top", { color: "white" });
+const toastG = m => showAdvancedMsg(T(m), "top", { color: "#2ecc71" });
+
+let me = null, username = "", rev = 0, loaded = false, saving = false, dirty = false, saveTimer = null;
+let unsubs = [], pendingName = null, inbox = [], outbox = [], draft = { give: {}, ask: {} };
+
+// si <script src="i18n.js"> manque dans index.html, on le charge ici (boutons EN/FR + traduction)
+if (!window.makeLangSwitch) await new Promise(r => { const sc = document.createElement("script"); sc.src = "i18n.js"; sc.onload = sc.onerror = r; document.head.appendChild(sc); });
+
+/* ---------- données de jeu ---------- */
+const fresh = () => { const d = { money: 0, potions: {}, discovered: {} }; Object.values(APPLE_FIELDS).forEach(f => d[f] = 0); return d; };
+const normalize = d => { d = d || {}; return { ...fresh(), ...d, potions: { ...(d.potions || {}) }, discovered: { ...(d.discovered || {}) } }; };
+const isKey = k => k === "money" || (k.startsWith("apple:") && !!APPLE_FIELDS[k.slice(6)]) || (k.startsWith("potion:") && SHOP_PRODUCTS.some(p => p.id === k.slice(7)));
+const isOffer = o => o && typeof o === "object" && Object.entries(o).every(([k, n]) => isKey(k) && Number.isInteger(n) && n > 0 && n < 1e15);
+const getQ = (d, k) => k === "money" ? d.money : k.startsWith("apple:") ? (d[APPLE_FIELDS[k.slice(6)]] || 0) : ((d.potions || {})[k.slice(7)] || 0);
+function addQ(d, k, n) {
+  if (k === "money") d.money += n;
+  else if (k.startsWith("apple:")) { const t = k.slice(6), f = APPLE_FIELDS[t]; d[f] = (d[f] || 0) + n; if (n > 0) d.discovered[t] = true; }
+  else { const id = k.slice(7); d.potions[id] = (d.potions[id] || 0) + n; }
+}
+function label(k) {
+  if (k === "money") return "$";
+  if (k.startsWith("apple:")) return T(APPLE_NAMES[k.slice(6)]);
+  const p = SHOP_PRODUCTS.find(p => p.id === k.slice(7)); return p ? T(`Luck x${p.multiplier}`) + ` (${p.duration}s)` : k;
+}
+const describe = m => Object.entries(m || {}).map(([k, n]) => `${fmtNum(n)}× ${esc(label(k))}`).join(", ") || T("nothing");
+
+/* ---------- écran de connexion ---------- */
+const ov = document.createElement("div");
+ov.style.cssText = "position:fixed;inset:0;z-index:9000;background:#000;border:10px solid #f1c40f;box-sizing:border-box;display:none;align-items:center;color:#f1c40f";
+const sBtn = (id, img, txt) => `<button id="${id}" style="display:flex;align-items:center;gap:14px;width:100%;padding:10px 20px;border:0;border-radius:50px;background:#fff;color:#222;font-size:15px;font-weight:500;cursor:pointer"><img src="${img}" style="width:28px;height:28px;border-radius:50%;object-fit:contain"><span>${txt}</span></button>`;
+const inp = "width:100%;box-sizing:border-box;padding:13px 16px;border-radius:12px;border:2px solid #f1c40f;background:#111;color:#fff;font-size:15px";
+ov.innerHTML = `<div style="width:48%;padding:0 3%;box-sizing:border-box;display:flex;flex-direction:row;align-items:center;gap:24px"><img src="${LOGO}" style="width:120px;height:120px;object-fit:contain;flex:none"><div style="font-size:40px;line-height:1.5;text-transform:uppercase;text-shadow:4px 4px 0 #333">Fast Collect Challenge</div></div>
+<div class="rb" style="position:absolute;top:36px;right:170px;font-size:14px;color:#ddd"><span id="au-q">No account?</span> <a id="au-alt" href="#" style="color:#f1c40f;font-weight:700">Sign-up here</a></div>
+<div class="rb" style="width:52%;display:flex;justify-content:center"><div style="width:360px;display:flex;flex-direction:column;gap:14px">
+<input id="au-name" style="${inp}" placeholder="Username or email"><input id="au-pw" type="password" style="${inp}" placeholder="Password (6+ chars)">
+<button id="au-main" style="padding:13px;border:0;border-radius:50px;background:#f1c40f;color:#000;font-size:15px;font-weight:700;cursor:pointer">Log in</button>
+<div id="au-social" style="display:flex;flex-direction:column;gap:14px">${sBtn("au-google", "https://png.pngtree.com/png-vector/20230817/ourmid/pngtree-google-logo-vector-png-image_9183290.png", "Log-in with Google")}${sBtn("au-github", "https://cdn-icons-png.flaticon.com/512/25/25231.png", "Log-in with Github")}<a id="au-guest" href="#" style="color:#aaa;text-align:center;font-size:13px">Play as guest</a></div>
+<div id="au-err" style="color:#ff6b6b;font-size:13px;min-height:16px;text-align:center"></div></div></div>`;
+const boot = document.createElement("div"); // écran de chargement pendant la connexion automatique
+boot.style.cssText = "position:fixed;inset:0;z-index:8999;background:#000;border:10px solid #f1c40f;box-sizing:border-box;display:flex;align-items:center;justify-content:center";
+boot.innerHTML = `<img src="${LOGO}" style="width:140px;height:140px;object-fit:contain">`;
+document.body.appendChild(boot);
+document.body.appendChild(ov);
+if (window.makeLangSwitch) { const w = makeLangSwitch(); w.style.cssText = "top:14px;left:16px"; ov.appendChild(w); }
+const err = e => $("au-err").textContent = (e && (e.code || e.message)) || String(e);
+  [/^Ready$/, "Prêt"], [/^Not ready$/, "Pas prêt"], [/^Invalid offer$/, "Offre invalide"],
+  [/^Press Ready when your offer is final$/, "Appuie sur Prêt quand ton offre est finale"],
+  [/^Waiting for (@\S+) to be ready\.\.\.$/, "En attente que $1 soit prêt..."],
+  [/^Waiting for (@\S+) to confirm\.\.\.$/, "En attente de la confirmation de $1..."],
+  [/^Both ready! Press Confirm$/, "Les deux sont prêts ! Appuie sur Confirmer"],
+  [/^Completing in (\d+)s\.\.\.$/, "Fin de l'échange dans $1s..."],
+  [/^Trade with (@\S+) completed!$/, "Échange avec $1 terminé !"],
+window.addEventListener("unhandledrejection", e => { console.error(e.reason); err(e.reason); });
+window.addEventListener("error", e => err(e.message));
+let mode = "login";
+function setMode(m) {
+  mode = m; const su = m === "signup";
+  $("au-main").textContent = su ? "Sign up" : "Log in";
+  $("au-social").style.display = su ? "none" : "flex";
+  $("au-q").textContent = su ? "Already have an account?" : "No account?";
+  $("au-alt").textContent = su ? "Log-in here" : "Sign-up here"; err("");
+}
+
+async function pseudoAuth(signup) {
+  const raw = $("au-name").value.trim(), pw = $("au-pw").value; err("");
+  try {
+    if (raw.includes("@")) {
+      await (signup ? createUserWithEmailAndPassword(auth, raw, pw) : signInWithEmailAndPassword(auth, raw, pw));
+    } else {
+      const n = clean(raw); if (!okName(n)) return err("Username: 3-16 chars, a-z 0-9 _");
+      if (signup) {
+        if ((await getDoc(doc(db, "usernames", n))).exists()) return err("Username already taken");
+        pendingName = n; await createUserWithEmailAndPassword(auth, n + FAKE, pw);
+      } else await signInWithEmailAndPassword(auth, n + FAKE, pw);
+    }
+  } catch (e) { pendingName = null; err(e); }
+}
+$("au-main").onclick = () => pseudoAuth(mode === "signup");
+$("au-alt").onclick = e => { e.preventDefault(); setMode(mode === "signup" ? "login" : "signup"); };
+let popupBusy = false;
+const social = Provider => {
+  if (popupBusy) return;
+  popupBusy = true; err("");
+  signInWithPopup(auth, new Provider())
+    .catch(e => err(e.code === "auth/popup-blocked" ? "Popup blocked: allow popups for this site and try again" : e))
+    .finally(() => { popupBusy = false; });
+};
+$("au-google").onclick = () => social(GoogleAuthProvider);
+$("au-github").onclick = () => social(GithubAuthProvider);
+$("au-guest").onclick = e => { e.preventDefault(); signInAnonymously(auth).catch(err); };
+
+/* ---------- profil ---------- */
+const AV0 = "https://raw.githubusercontent.com/FastCollectChallenge/play/main/Fast%20Collect%20Challenge.png";
+let myPhoto = "";
+const pf = document.createElement("div"); pf.id = "profile-page";
+pf.style.cssText = "position:fixed;inset:0;z-index:9100;background:#000;border:10px solid #f1c40f;box-sizing:border-box;display:none;align-items:center;color:#f1c40f";
+pf.innerHTML = `<div style="width:48%;padding:0 3%;box-sizing:border-box;display:flex;flex-direction:row;align-items:center;gap:24px"><img src="${LOGO}" style="width:120px;height:120px;object-fit:contain;flex:none"><div style="font-size:40px;line-height:1.5;text-transform:uppercase;text-shadow:4px 4px 0 #333">Fast Collect Challenge</div></div>
+<div class="rb" style="width:52%;display:flex;justify-content:center"><div style="width:380px;display:flex;flex-direction:column;gap:14px">
+<div id="pf-title" style="font-size:22px;font-weight:700;color:#fff;text-align:center;line-height:1.3"></div>
+<div style="display:flex;justify-content:center"><img id="pf-prev" style="width:110px;height:110px;border-radius:50%;object-fit:cover;border:3px solid #f1c40f;background:#222"></div>
+<input id="pf-name" style="${inp}" placeholder="Username (3-16: a-z, 0-9, _)"><input id="pf-photo" style="${inp}" placeholder="Profile picture URL (https://...)">
+<label id="pf-imp-row" style="display:none;color:#ddd;font-size:13px"><input type="checkbox" id="pf-imp" checked> <span>Import my local progress</span> <b id="pf-imp-name"></b></label>
+<div id="pf-lang" style="display:none;align-items:center;justify-content:center;gap:12px;color:#ddd;font-size:14px"><span>Language</span></div>
+<button id="pf-ok" style="padding:13px;border:0;border-radius:50px;background:#f1c40f;color:#000;font-size:15px;font-weight:700;cursor:pointer"></button>
+<a id="pf-close" href="#" style="color:#ddd;text-align:center;font-size:13px">Close</a><a id="pf-out" href="#" style="color:#aaa;text-align:center;font-size:13px">Log out</a>
+<div id="pf-err" style="color:#ff6b6b;font-size:13px;min-height:16px;text-align:center"></div></div></div>`;
+document.body.appendChild(pf);
+if (window.makeLangSwitch) { const w = makeLangSwitch(); w.style.position = "static"; $("pf-lang").appendChild(w); }
+const pferr = m => $("pf-err").textContent = m ? (m.code || m.message || String(m)) : "";
+function showPrev() {
+  const im = $("pf-prev"), u = $("pf-photo").value.trim();
+  im.onerror = () => { im.onerror = null; im.src = AV0; };
+  im.src = /^https:\/\/\S+$/i.test(u) ? u : AV0;
+}
+$("pf-photo").oninput = showPrev;
+function openProfilePage({ edit, noName, name, photo, loc, submit, cancel }) {
+  $("pf-title").textContent = edit ? "Edit your profile picture" : noName ? "Choose your profile picture" : "Choose your username and profile picture";
+  $("pf-ok").textContent = edit ? "Save" : "Continue";
+  $("pf-name").value = name || ""; $("pf-name").disabled = !!edit; $("pf-name").style.display = noName ? "none" : ""; $("pf-photo").value = photo || ""; showPrev();
+  $("pf-imp-row").style.display = loc ? "block" : "none"; if (loc) $("pf-imp-name").textContent = `(${loc.k})`;
+  $("pf-close").style.display = edit ? "block" : "none"; $("pf-lang").style.display = edit ? "flex" : "none"; $("pf-out").textContent = edit && auth.currentUser && auth.currentUser.isAnonymous ? "Log in / Sign up" : "Log out"; pferr(""); pf.style.display = "flex";
+  $("pf-ok").onclick = async () => {
+    const n = noName ? name : clean($("pf-name").value), p = $("pf-photo").value.trim();
+    if (!okName(n)) return pferr("Invalid username");
+    if (p && !/^https:\/\/\S+$/i.test(p)) return pferr("Invalid picture URL (must start with https://)");
+    try { await submit(n, p, $("pf-imp").checked); pf.style.display = "none"; }
+    catch (e) { pferr(e.message === "taken" ? "Username already taken" : e); }
+  };
+  $("pf-close").onclick = e => { e.preventDefault(); pf.style.display = "none"; };
+  $("pf-out").onclick = async e => { e.preventDefault(); await cancel(); pf.style.display = "none"; };
+}
+function setAvatar(url) {
+  const b = $("account-settings-btn"); if (!b) return;
+  b.innerHTML = '<img style="width:100%;height:100%;border-radius:50%;object-fit:cover;border:calc(3*var(--u)) solid #f1c40f;box-sizing:border-box;background:#222">';
+  const im = b.firstChild; im.onerror = () => { im.onerror = null; im.src = AV0; }; im.src = url || AV0;
+}
+
+const readLocal = () => {
+  try { const a = JSON.parse(localStorage.getItem("fastCollect_accounts") || "null"), k = localStorage.getItem("fastCollect_activeAccount"); return a && a[k] ? { k, d: a[k] } : null; }
+  catch (e) { return null; }
+};
+const claim = (user, name, photo, init) => runTransaction(db, async t => {
+  const u = doc(db, "usernames", name);
+  if ((await t.get(u)).exists()) throw new Error("taken");
+  t.set(u, { uid: user.uid });
+  t.set(doc(db, "users", user.uid), { username: name, photo, rev: 1, data: init });
+});
+const suggest = u => clean((u.displayName || u.email || "").split("@")[0]).replace(/[^a-z0-9_]/g, "_").slice(0, 16);
+
+async function ensureProfile(user) {
+  if ((await getDoc(doc(db, "users", user.uid))).exists()) return true;
+  const loc = readLocal(), chosen = pendingName; pendingName = null;
+  if (user.isAnonymous) { // invité : pas de page, pseudo guestXXXX
+    let init = fresh();
+    if (loc && confirm(`Import your local progress from "${loc.k}"?`)) init = normalize(loc.d);
+    for (let i = 0; i < 5; i++) {
+      try { await claim(user, "guest" + Math.floor(1000 + Math.random() * 9000), "", init); return true; }
+      catch (e) { if (e.message !== "taken") throw e; }
+    }
+    await signOut(auth); return false;
+  }
+  // Toute création de compte : page de profil (pseudo + mot de passe : photo seule, sans champ pseudo)
+  return new Promise(res => openProfilePage({
+    edit: false, noName: !!chosen, name: chosen || suggest(user), photo: user.photoURL || "", loc,
+    submit: async (n, p, imp) => { await claim(user, n, p, imp && loc ? normalize(loc.d) : fresh()); res(true); },
+    cancel: async () => { await signOut(auth); res(false); }
+  }));
+}
+
+function applyRemote(v) {
+  rev = v.rev; username = v.username; myPhoto = v.photo || ""; setAvatar(myPhoto); if (window.autosellReset) window.autosellReset();
+  accounts = { [username]: normalize(v.data) }; currentAccountName = username;
+  updateAdventureHUD();
+}
+
+/* ---------- sauvegarde cloud (remplace saveAllAccounts) ---------- */
+async function saveNow() {
+  if (!me) return;
+  if (saving) { dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 1500); return; }
+  if (!dirty) return;
+  saving = true; dirty = false;
+  const ref = doc(db, "users", me);
+  try {
+    let conflict = null;
+    await runTransaction(db, async t => {
+      conflict = null;
+      const v = (await t.get(ref)).data();
+      if (v.rev !== rev) { conflict = v; return; }
+      t.update(ref, { data: accounts[currentAccountName], rev: rev + 1 });
+    });
+    if (conflict) applyRemote(conflict); else rev++;
+  } catch (e) { dirty = true; console.error("save failed", e); }
+  saving = false;
+}
+window.saveAllAccounts = function () { updateAdventureHUD(); if (!me) return; dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 2000); };
+const _leave = window.leaveGame;
+window.leaveGame = function () { _leave(); saveNow(); };
+window.openAccountModal = () => me && openProfilePage({
+  edit: true, name: username, photo: myPhoto,
+  submit: async (n, p) => { await updateDoc(doc(db, "users", me), { photo: p }); myPhoto = p; setAvatar(p); },
+  cancel: async () => { await saveNow(); manualLogout = true; await signOut(auth); }
+});
+document.addEventListener("visibilitychange", () => { if (document.hidden) saveNow(); });
+window.addEventListener("pagehide", saveNow);
+
+/* ---------- Trade : UI ---------- */
+const trBtn = document.createElement("button");
+trBtn.id = "trade-btn"; trBtn.className = "side-btn"; trBtn.style.background = "rgb(255, 255, 255)";
+trBtn.innerHTML = `<img src="https://cdn-icons-png.flaticon.com/512/3439/3439283.png" alt="Trade" onerror="this.style.display='none';this.parentNode.classList.add('no-img')"><span class="side-btn-label">Trade</span><span id="tr-badge" style="display:none;position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;line-height:20px;border-radius:10px;background:#e84118;color:#fff;font-size:9px;text-align:center"></span>`;
+$("side-buttons").appendChild(trBtn);
+const trStyle = document.createElement("style");
+trStyle.textContent = `@keyframes trpop{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+.tr-hint{color:#aaa;text-align:center;padding:36px 0;font-size:14px}
+.tr-row{display:flex;align-items:center;gap:12px;padding:6px 0;margin-bottom:6px}
+.tr-av{width:36px;height:36px;border-radius:4px;object-fit:cover;background:#222;flex:none}
+.tr-mid{flex:1;min-width:0;font-size:14px}.tr-name{color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr-send{border:0;border-radius:2px;padding:9px 14px;background:#27ae60;color:#fff;cursor:pointer;font-size:14px;flex:none}
+.tr-send:disabled{background:#7f8c8d;cursor:not-allowed}
+#tr-toasts{position:fixed;right:20px;bottom:140px;z-index:1500;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.tr-toast{pointer-events:auto;width:300px;box-sizing:border-box;background:rgba(20,20,25,.92);border:2px solid #487eb0;border-radius:14px;padding:12px;color:#fff;font-size:14px;animation:trpop .22s ease-out}
+.tr-btns{display:flex;gap:8px;margin-top:10px}
+.tr-btns button{flex:1;background:transparent;color:#fff;border-radius:10px;padding:8px 0;font-size:13px;cursor:pointer}
+.tr-acc{border:2px solid #2ecc71}.tr-dec{border:2px solid #e74c3c}`;
+document.head.appendChild(trStyle);
+const trToasts = document.createElement("div"); trToasts.id = "tr-toasts"; document.body.appendChild(trToasts);
+
+const tr = document.createElement("div"); tr.id = "trade-screen"; tr.className = "rb";
+tr.style.cssText = "position:fixed;inset:0;margin:auto;width:400px;max-width:92vw;height:360px;max-height:80vh;background:#000;z-index:1000;border-radius:8px;border:1px solid #333;display:none;flex-direction:column;padding:14px;box-sizing:border-box;color:#fff";
+tr.innerHTML = `<button id="tr-close" style="display:none"></button>
+<div style="position:relative;margin-bottom:14px"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span><input id="tr-user" autocomplete="off" placeholder="Search for a user" style="width:100%;box-sizing:border-box;height:42px;padding:0 12px 0 40px;background:#000;border:1px solid #fff;border-radius:3px;color:#fff;font-size:15px;outline:none"></div>
+<div id="tr-results" style="flex:1;overflow-y:auto"></div>`;
+document.body.appendChild(tr);
+
+const HINT = '<div class="tr-hint">Type a username to search</div>';
+const beat = () => { if (me) updateDoc(doc(db, "users", me), { lastSeen: serverTimestamp() }).catch(() => {}); };
+const recent = t => !t.createdAt || Date.now() - t.createdAt.toMillis() < 120000;
+
+trBtn.onclick = () => {
+  ["inventory-screen", "shop-screen", "index-screen"].forEach(i => $(i).style.display = "none");
+  tr.style.display = "flex"; $("tr-user").value = ""; $("tr-results").innerHTML = HINT; $("tr-user").focus();
+};
+$("tr-close").onclick = () => { tr.style.display = "none"; };
+
+/* recherche en direct */
+let searchTimer = null, searchSeq = 0;
+$("tr-user").oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(doSearch, 300); };
+async function doSearch() {
+  const q = clean($("tr-user").value).replace(/^@/, ""), box = $("tr-results"), seq = ++searchSeq;
+  if (!q) { box.innerHTML = HINT; return; }
+  try {
+    const snap = await getDocs(query(collection(db, "usernames"), where(documentId(), ">=", q), where(documentId(), "<=", q + "\uf8ff"), limit(5)));
+    const ids = snap.docs.map(d => d.data().uid).filter(u => u !== me);
+    const users = await Promise.all(ids.map(u => getDoc(doc(db, "users", u))));
+    if (seq !== searchSeq) return;
+    box.textContent = "";
+    const found = users.filter(u => u.exists());
+    if (!found.length) { box.innerHTML = '<div class="tr-hint">No player found</div>'; return; }
+    found.forEach(u => box.appendChild(playerRow(u.id, u.data())));
+  } catch (e) { box.textContent = e.code || e.message; }
+}
+function playerRow(uid, u) {
+  const on = !!u.lastSeen && Date.now() - u.lastSeen.toMillis() < 100000;
+  const r = document.createElement("div"); r.className = "tr-row";
+  const img = new Image(); img.className = "tr-av"; img.onerror = () => { img.onerror = null; img.src = AV0; }; img.src = u.photo || AV0;
+  const mid = document.createElement("div"); mid.className = "tr-mid";
+  const nm = document.createElement("div"); nm.className = "tr-name"; nm.textContent = "@" + u.username;
+  const st = document.createElement("div"); st.textContent = on ? "Online" : "Offline"; st.style.color = on ? "#2ecc71" : "#e74c3c";
+  mid.append(nm, st);
+  const b = document.createElement("button"); b.className = "tr-send"; b.textContent = "Send Trade"; b.disabled = !on;
+  b.onclick = () => sendRequest(uid, u.username, b);
+  r.append(img, mid, b); return r;
+}
+async function sendRequest(uid, uname, btn) {
+  if (outbox.some(t => t.to === uid && recent(t))) return toast("Request already pending");
+  btn.disabled = true;
+  try {
+    await addDoc(collection(db, "trades"), { from: me, fromName: username, to: uid, toName: uname, give: {}, ask: {}, offers: {}, status: "pending", createdAt: serverTimestamp() });
+    btn.textContent = "Request sent"; toast("Trade request sent!");
+  } catch (e) { btn.disabled = false; toast(e.message); }
+}
+
+/* demandes reçues : mini pop-up en bas à droite */
+const shown = new Map(), dismissed = new Set();
+function renderIncoming(list) {
+  const ids = new Set();
+  list.forEach(t => {
+    if (!recent(t) || dismissed.has(t.id)) return;
+    ids.add(t.id); if (!shown.has(t.id)) shown.set(t.id, makeToast(t));
+  });
+  shown.forEach((el, id) => { if (!ids.has(id)) { el.remove(); shown.delete(id); } });
+}
+function makeToast(t) {
+  const c = document.createElement("div"); c.className = "tr-toast rb";
+  const m = document.createElement("div"), b = document.createElement("b"), sp = document.createElement("span");
+  b.textContent = "@" + t.fromName; sp.textContent = " sent you a trade request"; m.append(b, sp);
+  const row = document.createElement("div"); row.className = "tr-btns";
+  const ac = document.createElement("button"), de = document.createElement("button");
+  ac.className = "tr-acc"; ac.textContent = "Accept"; de.className = "tr-dec"; de.textContent = "Decline";
+  ac.onclick = () => respond(t, "accepted"); de.onclick = () => respond(t, "declined");
+  row.append(ac, de); c.append(m, row); trToasts.appendChild(c);
+  setTimeout(() => { dismissed.add(t.id); c.remove(); shown.delete(t.id); }, 30000);
+  return c;
+}
+async function respond(t, status) {
+  dismissed.add(t.id); const el = shown.get(t.id); if (el) el.remove(); shown.delete(t.id);
+  try { await updateDoc(doc(db, "trades", t.id), { status }); toast(status === "accepted" ? "Trade request accepted" : "Trade request declined"); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- Trade : fenêtre d'échange ---------- */
+const twStyle = document.createElement("style");
+twStyle.textContent = `.tw-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;align-content:start}
+.tw-card{background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.15);border-radius:16px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:6px;min-height:112px}
+.tw-card.click{cursor:pointer}.tw-card.click:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.4)}
+.tw-card.on{border-color:#4ADE80;background:rgba(74,222,128,.2)}
+.tw-card .nm{font-size:12px;text-align:center}.tw-card img{width:44px;height:44px;object-fit:contain}
+.tw-card .q{align-self:flex-end;font-size:14px;margin-top:auto}
+.tw-hint{grid-column:1/-1;color:#9aa3ad;text-align:center;padding:30px 0;font-size:14px}
+#trading-screen{animation:trpop .22s ease-out}`;
+document.head.appendChild(twStyle);
+const tw = document.createElement("div"); tw.id = "trading-screen"; tw.className = "rb";
+tw.style.cssText = "position:fixed;inset:0;margin:auto;width:min(820px,94vw);height:min(540px,86vh);background:rgba(0,0,0,.6);z-index:1000;border-radius:25px;border:3px solid rgba(255,255,255,.2);backdrop-filter:blur(8px);display:none;flex-direction:column;padding:22px;box-sizing:border-box;color:#fff";
+tw.innerHTML = `<div class="screen-header" style="margin-bottom:14px;padding-bottom:12px"><h2 class="inv-title-text" id="tw-title" style="color:#fff;font-size:14px"></h2><button class="close-screen-btn" id="trading-close">Close ✖</button></div>
+<div style="flex:1;display:flex;min-height:0">
+<div style="flex:1;display:flex;flex-direction:column;min-width:0;padding-right:14px"><div style="font-size:16px;margin-bottom:10px;text-align:center">Your offer</div><div id="tw-mine" class="tw-grid"></div></div>
+<div style="width:2px;background:rgba(255,255,255,.2)"></div>
+<div style="flex:1;display:flex;flex-direction:column;min-width:0;padding-left:14px"><div id="tw-their-title" style="font-size:16px;margin-bottom:10px;text-align:center"></div><div id="tw-theirs" class="tw-grid"></div></div></div>`;
+document.body.appendChild(tw);
+const twFoot = document.createElement("div");
+twFoot.style.cssText = "display:flex;align-items:center;justify-content:center;gap:12px;margin-top:14px";
+twFoot.innerHTML = `<div id="tw-state" style="font-size:14px;color:#ddd;text-align:center"></div><button id="tw-main" class="tr-send" style="padding:12px 22px;font-size:15px"></button><button id="tw-cancel" class="tr-send" style="padding:12px 22px;font-size:15px;background:#c23616;display:none">Cancel</button>`;
+tw.appendChild(twFoot);
+
+const am2 = document.createElement("div"); am2.id = "add-modal"; am2.className = "rb";
+am2.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:2100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)";
+const qcol = (vals, cls, last) => `<div class="qty-col">${vals.map(v => `<button class="qty-btn ${cls}" data-d="${v}">${v}</button>`).join("")}<button class="qty-btn ${cls}" data-d="${last.toLowerCase()}">${last}</button></div>`;
+am2.innerHTML = `<div class="sell-box"><h3>Quantity to add</h3><div id="add-name" style="font-size:15px"></div>
+<div style="display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:12px;align-items:center;margin:14px 0">${qcol(["-1", "-3", "-5", "-10"], "qty-neg", "None")}<div id="add-num" style="font-size:26px;text-align:center;color:#fff">0</div>${qcol(["+1", "+3", "+5", "+10"], "qty-pos", "All")}</div>
+<div class="sell-actions"><button class="acc-btn" id="add-ok">Confirm</button><button class="acc-btn danger" id="add-cancel">Cancel</button></div></div>`;
+document.body.appendChild(am2);
+
+let cur = null, curUnsub = null, twTimer = null, sigLast = "", addType = null, addQty = 0, addMax = 0;
+const owned = t => (accounts[currentAccountName] || {})[APPLE_FIELDS[t]] || 0;
+const offerOf = (uid, t) => (cur && cur.offers && cur.offers[uid] && cur.offers[uid][t]) || 0;
+function twCard(type, qty, click) {
+  const c = document.createElement("div"); c.className = "tw-card" + (click ? " click" : "") + (click && qty > 0 ? " on" : "");
+  const n = document.createElement("div"); n.className = "nm"; n.textContent = APPLE_NAMES[type];
+  const im = new Image(); im.src = IMG_FRUITS[type];
+  const q = document.createElement("div"); q.className = "q"; q.textContent = "x" + fmtNum(qty);
+  c.append(n, im, q); if (click) c.onclick = click; return c;
+}
+function renderTrading() {
+  renderFooter();
+  if (!cur) return;
+  const other = cur.from === me ? cur.to : cur.from;
+  const sig = JSON.stringify([cur.offers || {}, APPLE_ORDER.map(owned)]);
+  if (sig === sigLast) return; sigLast = sig;
+  const mine = $("tw-mine"), theirs = $("tw-theirs"); mine.innerHTML = ""; theirs.innerHTML = "";
+  const hint = m => `<div class="tw-hint">${m}</div>`;
+  APPLE_ORDER.forEach(t => { if (owned(t) > 0 || offerOf(me, t) > 0) mine.appendChild(twCard(t, offerOf(me, t), () => openAdd(t))); });
+  if (!mine.children.length) mine.innerHTML = hint("You have no apples");
+  APPLE_ORDER.forEach(t => { if (offerOf(other, t) > 0) theirs.appendChild(twCard(t, offerOf(other, t))); });
+  if (!theirs.children.length) theirs.innerHTML = hint("Nothing yet");
+}
+function openTrading(t) {
+  if (cur) return;
+  cur = t; sigLast = "";
+  const other = t.from === me ? t.toName : t.fromName;
+  $("tw-title").textContent = "Trading with @" + other;
+  $("tw-their-title").textContent = "@" + other + "'s offer";
+  ["inventory-screen", "shop-screen", "index-screen"].forEach(i => $(i).style.display = "none");
+  tr.style.display = "none"; tw.style.display = "flex"; renderTrading();
+  curUnsub = onSnapshot(doc(db, "trades", t.id), s => {
+    if (!s.exists()) return stopTrading();
+    cur = { id: s.id, ...s.data() };
+    if (cur.status === "completed") { toastG(`Trade with @${other} completed!`); return stopTrading(); }
+    if (cur.status !== "accepted") { if (cur.cancelledBy !== me) toastG("@" + other + " cancelled the trade"); return stopTrading(); }
+    renderTrading();
+  });
+  twTimer = setInterval(renderTrading, 1500);
+}
+function stopTrading() {
+  if (curUnsub) curUnsub(); curUnsub = null; clearInterval(twTimer); cur = null;
+  tw.style.display = "none"; am2.style.display = "none";
+}
+$("trading-close").onclick = () => {
+  const id = cur && cur.id; stopTrading();
+  if (id) updateDoc(doc(db, "trades", id), { status: "cancelled" }).catch(() => {});
+};
+const setAdd = n => { addQty = Math.max(0, Math.min(addMax, n)); $("add-num").textContent = addQty; };
+function openAdd(type) {
+  addType = type; addMax = owned(type); $("add-name").textContent = APPLE_NAMES[type];
+  setAdd(offerOf(me, type)); am2.style.display = "flex";
+}
+am2.addEventListener("click", e => {
+  const b = e.target.closest("[data-d]"); if (!b) return; const d = b.dataset.d;
+  setAdd(d === "none" ? 0 : d === "all" ? addMax : addQty + parseInt(d));
+});
+$("add-cancel").onclick = () => { am2.style.display = "none"; };
+/* ---------- Trade : Ready / Confirm / 5 s ---------- */
+const CD_MS = 5000, applying = new Set();
+let cdStart = 0, cdDone = false;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const flag = (t, k, uid) => !!(t[k] && t[k][uid]);
+const lacking = o => Object.keys(o).find(t => owned(t) < o[t]);
+const offerOfDoc = (t, uid) => (t.offers && t.offers[uid]) || {};
+
+function renderFooter() {
+  if (!cur) return;
+  const other = cur.from === me ? cur.to : cur.from, on = cur.from === me ? cur.toName : cur.fromName;
+  const rMe = flag(cur, "ready", me), rOt = flag(cur, "ready", other), cMe = flag(cur, "confirm", me), cOt = flag(cur, "confirm", other);
+  const st = $("tw-state"), main = $("tw-main"), cn = $("tw-cancel");
+  cn.style.display = "none"; main.style.display = ""; main.style.background = "#27ae60";
+  if (cMe && cOt) { main.style.display = "none"; cn.style.display = ""; }
+  else if (cMe) { st.textContent = `Waiting for @${on} to confirm...`; main.textContent = "Cancel"; main.style.background = "#c23616"; main.dataset.a = "unconfirm"; }
+  else if (rMe && rOt) { st.textContent = "Both ready! Press Confirm"; main.textContent = "Confirm"; main.dataset.a = "confirm"; }
+  else if (rMe) { st.textContent = `Waiting for @${on} to be ready...`; main.textContent = "Not ready"; main.style.background = "#7f8c8d"; main.dataset.a = "unready"; }
+  else { st.textContent = "Press Ready when your offer is final"; main.textContent = "Ready"; main.dataset.a = "ready"; }
+}
+const tradeUpd = patch => updateDoc(doc(db, "trades", cur.id), patch).catch(e => toast(e.message));
+$("tw-main").onclick = () => {
+  if (!cur) return; const a = $("tw-main").dataset.a, other = cur.from === me ? cur.to : cur.from, mine = offerOfDoc(cur, me);
+  if (a === "ready") {
+    if (!Object.keys(mine).length && !Object.keys(offerOfDoc(cur, other)).length) return toast("Empty offer");
+    const l = lacking(mine); if (l) return toast("You don't have enough: " + APPLE_NAMES[l]);
+    tradeUpd({ [`ready.${me}`]: true });
+  } else if (a === "unready") tradeUpd({ [`ready.${me}`]: false, [`confirm.${me}`]: false });
+  else if (a === "confirm") {
+    const l = lacking(mine); if (l) return toast("You don't have enough: " + APPLE_NAMES[l]);
+    tradeUpd({ [`confirm.${me}`]: true });
+  } else if (a === "unconfirm") cancelConfirm();
+};
+$("tw-cancel").onclick = () => cancelConfirm();
+
+async function cancelConfirm() {
+  if (!cur) return; const id = cur.id; cdStart = 0;
+  try {
+    await runTransaction(db, async tx => {
+      const r = doc(db, "trades", id), t = (await tx.get(r)).data();
+      if (!t || t.status !== "accepted") return;
+      tx.update(r, { [`confirm.${me}`]: false, ok: {} });
+    });
+  } catch (e) { toast(e.message); }
+}
+
+setInterval(() => {
+  if (!cur || cur.status !== "accepted") { cdStart = 0; return; }
+  const other = cur.from === me ? cur.to : cur.from;
+  if (!(flag(cur, "confirm", me) && flag(cur, "confirm", other))) { cdStart = 0; return; }
+  if (!cdStart) { cdStart = Date.now(); cdDone = false; }
+  const left = Math.ceil((CD_MS - (Date.now() - cdStart)) / 1000);
+  if (left > 0) { $("tw-state").textContent = `Completing in ${left}s...`; return; }
+  if (!cdDone) { cdDone = true; markOk(cur.id); }
+}, 250);
+
+async function markOk(id) {
+  let short = null, bad = false;
+  try {
+    await runTransaction(db, async tx => {
+      short = null; bad = false;
+      const r = doc(db, "trades", id), t = (await tx.get(r)).data();
+      if (!t || t.status !== "accepted" || !flag(t, "confirm", t.from) || !flag(t, "confirm", t.to)) return;
+      const other = t.from === me ? t.to : t.from;
+      short = lacking(offerOfDoc(t, me));
+      if (short) { tx.update(r, { status: "cancelled", cancelledBy: me }); return; }
+      if (t.ok && t.ok[other]) {
+        const od = normalize(((await tx.get(doc(db, "users", other))).data() || {}).data), go = offerOfDoc(t, other);
+        if (Object.entries(go).some(([k, n]) => !APPLE_FIELDS[k] || !Number.isInteger(n) || n <= 0 || (od[APPLE_FIELDS[k]] || 0) < n)) { bad = true; tx.update(r, { status: "cancelled", cancelledBy: me }); return; }
+        tx.update(r, { ok: { ...t.ok, [me]: true }, status: "completed", unapplied: [t.from, t.to] });
+      } else tx.update(r, { ok: { ...(t.ok || {}), [me]: true } });
+    });
+    if (short) toast("You don't have enough: " + APPLE_NAMES[short]);
+    if (bad) toast("Invalid offer");
+  } catch (e) { toast(e.message); }
+}
+
+async function applyTrade(t) {
+  if (applying.has(t.id)) return; applying.add(t.id);
+  try {
+    for (let i = 0; saving && i < 50; i++) await sleep(200);
+    dirty = true; await saveNow();
+    await runTransaction(db, async tx => {
+      const tr = doc(db, "trades", t.id), ur = doc(db, "users", me);
+      const td = (await tx.get(tr)).data(), v = (await tx.get(ur)).data();
+      if (!td || !(td.unapplied || []).includes(me)) return;
+      const other = td.from === me ? td.to : td.from, d = normalize(v.data);
+      const give = offerOfDoc(td, me), get = offerOfDoc(td, other);
+      const valid = o => Object.entries(o).every(([k, n]) => APPLE_FIELDS[k] && Number.isInteger(n) && n > 0);
+      if (!valid(give) || !valid(get)) throw new Error("Invalid offer");
+      for (const [k, n] of Object.entries(give)) if ((d[APPLE_FIELDS[k]] || 0) < n) throw new Error("You don't have enough items");
+      for (const [k, n] of Object.entries(give)) d[APPLE_FIELDS[k]] -= n;
+      for (const [k, n] of Object.entries(get)) { d[APPLE_FIELDS[k]] = (d[APPLE_FIELDS[k]] || 0) + n; d.discovered[k] = true; }
+      tx.update(ur, { data: d, rev: v.rev + 1 });
+      tx.update(tr, { unapplied: arrayRemove(me) });
+    });
+  } catch (e) { toast(e.message); }
+  applying.delete(t.id);
+}
+$("add-ok").onclick = async () => {
+  const id = cur && cur.id; am2.style.display = "none"; if (!id) return;
+  try { await updateDoc(doc(db, "trades", id), { [`offers.${me}.${addType}`]: addQty > 0 ? addQty : deleteField(), ready: {}, confirm: {}, ok: {} }); }
+  catch (e) { toast(e.message); }
+};
+
+/* ---------- invité automatique + Google One Tap ---------- */
+const GCLIENT = "357477145806-jagr0f20lv71eef6tj61e37lhdv4bd4h.apps.googleusercontent.com";
+let manualLogout = false, gisReady = false;
+function promptOneTap() {
+  if (!auth.currentUser || !auth.currentUser.isAnonymous) return; // seulement pour les invités
+  const go = () => {
+    try {
+      if (!gisReady) { gisReady = true; google.accounts.id.initialize({ client_id: GCLIENT, cancel_on_tap_outside: false, callback: onGoogleCredential }); }
+      google.accounts.id.prompt();
+    } catch (e) { console.warn("One Tap:", e); }
+  };
+  if (window.google && google.accounts) return go();
+  if ($("gsi-script")) return;
+  const sc = document.createElement("script"); sc.id = "gsi-script"; sc.src = "https://accounts.google.com/gsi/client"; sc.async = true; sc.onload = go;
+  document.head.appendChild(sc);
+}
+async function onGoogleCredential(resp) {
+  try {
+    const cred = GoogleAuthProvider.credential(resp.credential), u = auth.currentUser;
+    if (u && u.isAnonymous) {
+      try {
+        await linkWithCredential(u, cred); // l'invité garde son compte et sa progression
+        try {
+          const pic = JSON.parse(atob(resp.credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).picture;
+          if (pic && !myPhoto) { await updateDoc(doc(db, "users", u.uid), { photo: pic }); myPhoto = pic; setAvatar(pic); }
+        } catch (e) {}
+        toast("Google account linked!");
+      } catch (e) {
+        if (e.code === "auth/credential-already-in-use" || e.code === "auth/email-already-in-use") await signInWithCredential(auth, GoogleAuthProvider.credentialFromError(e) || cred); // compte Google déjà existant : on s'y connecte
+        else throw e;
+      }
+    } else await signInWithCredential(auth, cred);
+  } catch (e) { toast(e.message || e.code); }
+}
+
+/* ---------- session ---------- */
+onAuthStateChanged(auth, async user => {
+  unsubs.forEach(u => u()); unsubs = []; loaded = false; inbox = []; outbox = []; stopTrading();
+  if (!user) {
+    if (me) { me = null; try { leaveGame(); } catch (e) {} }
+    ov.style.display = "flex"; return;
+  }
+  manualLogout = false;
+  try { if (!(await ensureProfile(user))) return; } catch (e) { err(e); ov.style.display = "flex"; return; }
+  me = user.uid; beat(); const hb = setInterval(beat, 45000); unsubs.push(() => clearInterval(hb));
+    unsubs.push(onSnapshot(query(collection(db, "trades"), where("unapplied", "array-contains", me)), s => {
+    s.docs.forEach(d => { const t = { id: d.id, ...d.data() }; if (t.status === "completed") applyTrade(t); });
+  }));
+  unsubs.push(onSnapshot(doc(db, "users", me), s => {
+    if (!s.exists()) return; const v = s.data();
+    if (!loaded || (!saving && v.rev > rev)) {
+      try { applyRemote(v); loaded = true; ov.style.display = "none"; boot.style.display = "none"; promptOneTap(); } catch (e) { err(e); console.error(e); }
+    }
+  }, e => { err(e); console.error(e); }));
+  unsubs.push(onSnapshot(query(collection(db, "trades"), where("to", "==", me), where("status", "==", "pending")), s => {
+    inbox = s.docs.map(d => ({ id: d.id, ...d.data() })); renderIncoming(inbox);
+  }));
+  unsubs.push(onSnapshot(query(collection(db, "trades"), where("from", "==", me), where("status", "==", "pending")), s => {
+    outbox = s.docs.map(d => ({ id: d.id, ...d.data() }));
+  }));
+  ["to", "from"].forEach(k => unsubs.push(onSnapshot(query(collection(db, "trades"), where(k, "==", me), where("status", "==", "accepted")), s => {
+    s.docChanges().forEach(c => {
+      if (c.type !== "added") return; const t = { id: c.doc.id, ...c.doc.data() };
+      if (t.createdAt && Date.now() - t.createdAt.toMillis() < 1800000) openTrading(t);
+    });
+  })));
+});
+
+
+// interface du jeu (logos, popups sans pause, autosell...) : chargée automatiquement
+if (!window.__gameUI) { window.__gameUI = true; const g = document.createElement("script"); g.src = "game-ui.js"; document.head.appendChild(g); }
