@@ -571,7 +571,6 @@ onAuthStateChanged(auth, async user => {
   unsubs.forEach(u => u()); unsubs = []; loaded = false; inbox = []; outbox = []; stopTrading();
   if (!user) {
     if (me) { me = null; try { leaveGame(); } catch (e) {} }
-    if (!manualLogout) { signInAnonymously(auth).catch(e => { err(e); ov.style.display = "flex"; }); return; } // invité automatique
     ov.style.display = "flex"; return;
   }
   manualLogout = false;
