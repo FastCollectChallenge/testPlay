@@ -199,6 +199,7 @@ async function ensureProfile(user) {
 function applyRemote(v) {
   rev = v.rev; username = v.username; myPhoto = v.photo || ""; setAvatar(myPhoto); if (window.autosellReset) window.autosellReset();
   accounts = { [username]: normalize(v.data) }; currentAccountName = username;
+  window.__fcUser = username; try { setMode(window.__fcMode || "menu"); } catch (e) {}
   updateAdventureHUD();
 }
 
@@ -570,6 +571,7 @@ async function onGoogleCredential(resp) {
 onAuthStateChanged(auth, async user => {
   unsubs.forEach(u => u()); unsubs = []; loaded = false; inbox = []; outbox = []; stopTrading();
   if (!user) {
+    window.__fcUser = ""; try { setMode(window.__fcMode || "menu"); } catch (e) {}
     if (me) { me = null; try { leaveGame(); } catch (e) {} }
     ov.style.display = "flex"; return;
   }
