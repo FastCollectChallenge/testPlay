@@ -86,3 +86,48 @@
 #autosell-modal .auto-card { background: rgba(255,255,255,.15) !important; border: 4px solid var(--ink) !important; border-radius: 20px !important; box-shadow: 0 4px 0 var(--ink); }
 #autosell-modal .auto-card.on { background: linear-gradient(180deg, #7bf5a8, #2fc46f) !important; }
 #autosell-modal .auto-card.on b { color: #0d4d28; }
+
+/* ================= ÉCRAN D'ACCUEIL ================= */
+#home-screen {
+  background: radial-gradient(circle at 50% 35%, #8b5cf6 0%, #5a37c2 40%, #2a1a7a 100%) !important;
+  border: 10px solid var(--ink) !important;
+  box-shadow: inset 0 0 0 6px var(--gold) !important;
+}
+.main-title {
+  color: var(--gold) !important;
+  -webkit-text-stroke: calc(7 * var(--u)) var(--ink); paint-order: stroke fill;
+  text-shadow: 0 calc(7 * var(--u)) 0 var(--ink) !important;
+  animation: cartoonFloat 2.4s ease-in-out infinite;
+}
+@keyframes cartoonFloat { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(calc(-8 * var(--u))) rotate(1deg); } }
+
+.mode-card {
+  border: calc(7 * var(--u)) solid var(--ink) !important; border-radius: calc(32 * var(--u)) !important;
+  color: #fff !important; -webkit-text-stroke: calc(4 * var(--u)) var(--ink); paint-order: stroke fill;
+  text-shadow: 0 calc(4 * var(--u)) 0 var(--ink);
+  box-shadow: 0 calc(14 * var(--u)) 0 var(--ink-deep), inset 0 calc(6 * var(--u)) 0 rgba(255,255,255,.4) !important;
+  transition: transform .15s, box-shadow .15s, filter .15s !important;
+}
+.modes-container .mode-card:nth-child(1) { background: linear-gradient(180deg, #5ef2a5, #1fb36b) !important; }
+.modes-container .mode-card:nth-child(2) { background: linear-gradient(180deg, #ffb35e, #ff5f6d) !important; }
+.mode-card:hover {
+  transform: translateY(calc(-12 * var(--u))) scale(1.04) rotate(-1deg) !important; border-color: var(--ink) !important; filter: brightness(1.08);
+  box-shadow: 0 calc(20 * var(--u)) 0 var(--ink-deep), inset 0 calc(6 * var(--u)) 0 rgba(255,255,255,.4) !important;
+}
+.mode-card:active {
+  transform: translateY(calc(6 * var(--u))) scale(.98) !important;
+  box-shadow: 0 calc(4 * var(--u)) 0 var(--ink-deep), inset 0 calc(6 * var(--u)) 0 rgba(255,255,255,.4) !important;
+}
+
+.bottom-action-btn { border: calc(5 * var(--u)) solid var(--ink) !important; box-shadow: 0 calc(6 * var(--u)) 0 var(--ink) !important; box-sizing: border-box; }
+.bottom-action-btn:active { transform: translateY(calc(4 * var(--u))) !important; }
+.discord-btn-left { background: linear-gradient(180deg, #8da0ff, #5865f2) !important; }
+.logo-placeholder img { filter: drop-shadow(0 calc(5 * var(--u)) 0 var(--ink)); }
+#account-settings-btn img { filter: drop-shadow(0 3px 0 var(--ink)); }
+
+.lang-sw { border: 4px solid var(--ink) !important; border-radius: 16px !important; background: rgba(255,255,255,.3) !important; box-shadow: 0 4px 0 var(--ink); }
+.lang-btn { border: 3px solid var(--ink) !important; }
+.lang-btn.on { box-shadow: inset 0 0 0 3px var(--gold) !important; }
+
+#leave-game-btn { background: linear-gradient(180deg, #ffe066, #ffb703) !important; border: 4px solid var(--ink) !important; color: var(--ink) !important; box-shadow: 0 5px 0 var(--ink) !important; }
+#leave-game-btn:hover { background: linear-gradient(180deg, #fff0a0, #ffc933) !important; }
