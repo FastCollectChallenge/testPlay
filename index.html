@@ -311,9 +311,9 @@
     
     <button id="leave-game-btn" onclick="leaveGame()"><span class="leave-icon">🕹️</span><span class="leave-label">Leave?</span></button>
     <div id="side-buttons">
-        <button id="inv-btn" class="side-btn" onclick="toggleInventory(true)"><img src="https://cdn-icons-png.flaticon.com/512/3313/3313637.png" alt="Inventory" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Inventory</span></button>
-        <button id="shop-btn" class="side-btn" onclick="toggleShop(true)"><img src="https://cdn-icons-png.flaticon.com/512/126/126122.png" alt="Shop" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Shop</span></button>
-        <button id="index-btn" class="side-btn" onclick="toggleIndex(true)"><img src="https://static.thenounproject.com/png/176559-200.png" alt="Index" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Index</span></button>
+        <button id="inv-btn" class="side-btn" onclick="toggleInventory(true)"><img src="Inventory Dark Mode.png" alt="Inventory" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Inventory</span></button>
+        <button id="shop-btn" class="side-btn" onclick="toggleShop(true)"><img src="Shop Dark Mode.png" alt="Shop" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Shop</span></button>
+        <button id="index-btn" class="side-btn" onclick="toggleIndex(true)"><img src="Index Dark Mode.png" alt="Index" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Index</span></button>
     </div>
     <canvas id="gameCanvas"></canvas>
 
@@ -1065,7 +1065,9 @@
 
             ctx.shadowBlur = 0; ctx.shadowColor = "transparent"; ctx.fillStyle = "#ffffff";
             ctx.font = "bold 40px Inter"; ctx.textAlign = "center"; 
-            ctx.fillText("🕹️", player.x, player.y); ctx.fillText(ball.emoji, ball.x, ball.y);
+            const FJ = window.FC_ICONS && FC_ICONS.joystick, FB = window.FC_ICONS && FC_ICONS.ball;
+            const fcPut = (im, x, y, emoji) => { if (im && im.width) { const h = 48, w = h * im.width / im.height; ctx.drawImage(im, x - w / 2, y - 14 - h / 2, w, h); } else ctx.fillText(emoji, x, y); };
+            fcPut(FJ, player.x, player.y, "🕹️"); fcPut(FB, ball.x, ball.y, ball.emoji);
             
             apples = apples.filter(a => {
                 let hitBox = a.size;
