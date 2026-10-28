@@ -219,7 +219,18 @@ async function saveNow() {
       t.update(ref, { data: accounts[currentAccountName], rev: rev + 1 });
     });
     if (conflict) applyRemote(conflict); else rev++;
-  } catch (e) { dirty = true; console.error("save failed", e); }
+  } catch (e) { 
+    dirty = true; 
+    console.error("save failed", e); 
+
+    // --- AJOUT : Si Firebase refuse la sauvegarde (ex: erreur 403 / triche), 
+    // on recharge instantanément les vraies données du serveur pour annuler l'affichage local ---
+    if (typeof loadAccountsFromServer === "function") {
+        loadAccountsFromServer();
+    } else if (typeof loadAccounts === "function") {
+        loadAccounts();
+    }
+  }
   saving = false;
 }
 window.saveAllAccounts = function () { updateAdventureHUD(); if (!me) return; dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 2000); };
