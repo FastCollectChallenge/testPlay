@@ -198,6 +198,7 @@ window.advCollect = a => {
   adv.bits[a.idx] = true; adv.unsent.push(a.type);
   const d = acc(); if (d) credit(d, a.type);
   updateAdventureHUD();
+  }
 };
 window.advStart = async function () {
   advStop(false);
