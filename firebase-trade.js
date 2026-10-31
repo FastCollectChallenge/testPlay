@@ -70,6 +70,7 @@ function applyData(d) {
   const a = accounts[currentAccountName] = normalize(d);
   adv.unsent.forEach(t => credit(a, t)); // pommes ramassées pas encore confirmées par le serveur
   updateAdventureHUD();
+  snap();
 }
 function serial(fn, refreshOnError) {
   qN++;
@@ -86,6 +87,7 @@ function serial(fn, refreshOnError) {
 const refreshMe = () => serial(async () => { const v = await api("/me"); srv.offset = v.now - Date.now(); return v; });
 function act(path, body, optimistic) { // action d'économie : affichage immédiat, le serveur tranche
   if (optimistic) { try { optimistic(); } catch (e) { console.error(e); } updateAdventureHUD(); }
+  snap();
   const p = serial(async () => { await advFlushRaw(); return api(path, "POST", body); }, true);
   p.catch(e => toast(errMsg(e)));
   return p;
@@ -188,6 +190,24 @@ function warnCheater() {
   warnOv.style.display = "flex";
 }
 
+/* ---------- détection : inventaire ou argent modifiés à la main ---------- */
+let trusted = null;
+function snap() { // valeurs officielles = ce que le serveur a donné + ce que le jeu a fait lui-même
+  const a = acc(); if (!a) { trusted = null; return; }
+  const ap = {}; Object.values(APPLE_FIELDS).forEach(f => ap[f] = a[f] || 0);
+  trusted = { money: a.money, ap, potions: { ...a.potions } };
+}
+setInterval(() => {
+  const a = acc(); if (!me || !a || !trusted) return;
+  let bad = a.money !== trusted.money;
+  for (const f in trusted.ap) if ((a[f] || 0) !== trusted.ap[f]) bad = true;
+  new Set([...Object.keys(a.potions || {}), ...Object.keys(trusted.potions)]).forEach(id => { if ((a.potions[id] || 0) !== (trusted.potions[id] || 0)) bad = true; });
+  if (!bad) return;
+  warnCheater();
+  a.money = trusted.money; Object.assign(a, trusted.ap); a.potions = { ...trusted.potions }; // on remet les vraies valeurs
+  updateAdventureHUD();
+}, 1000);
+
 window.advHold = () => adv.rolling; // pendant le changement de paquet, on ne ramasse pas (index.html)
 window.advCollect = a => {
   window.advCollect = a => {
@@ -197,6 +217,7 @@ window.advCollect = a => {
   if (!adv.on || a.advSeq !== adv.seq || a.idx == null || adv.bits[a.idx]) return;
   adv.bits[a.idx] = true; adv.unsent.push(a.type);
   const d = acc(); if (d) credit(d, a.type);
+  snap();
   updateAdventureHUD();
   }
 };
@@ -400,6 +421,7 @@ function applyRemote(v) {
   accounts = { [username]: normalize(v.data) }; currentAccountName = username;
   window.__fcUser = username; try { window.setMode(window.__fcMode || "menu"); } catch (e) {}
   updateAdventureHUD();
+  snap();
 }
 window.openAccountModal = () => me && openProfilePage({
   edit: true, name: username, photo: myPhoto,
