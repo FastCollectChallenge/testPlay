@@ -1,26 +1,30 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="🕹 Join Discord: https://discord.gg/52UY26TBQF">
+    <link rel="icon" href="icons/Fast%20Collect%20Challenge%20Title%20logo.png" type="image/png">
     <title>Fast Collect Challenge</title>
     <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;700;900&family=Press+Start+2P&family=Source+Sans+3:wght@600&display=swap" rel="stylesheet">
     <style>
-        * { font-family: 'Press Start 2P', cursive !important; font-synthesis: none; }
-        #spawn-panel, #spawn-panel *, .admin-msg { font-family: 'Nunito', sans-serif !important; }
+@font-face { font-family: 'Inter'; src: url('Inter.ttf') format('truetype'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Google Sans'; src: url('GoogleSans.ttf') format('truetype'); font-weight: 100 900; font-display: swap; }
+        * { font-family: 'Google Sans', sans-serif !important; font-synthesis: none; }
+
+        #spawn-panel, #spawn-panel *, .admin-msg { font-family: 'Google Sans', sans-serif !important; }
         body { margin: 0; overflow: hidden; background-color: #000; font-weight: 500; user-select: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
-        
+
         #score, #timer-display { position: absolute; color: white; font-size: 16px; font-weight: 900; z-index: 10; text-shadow: 2px 2px 4px black; display: none; }
         #score { left: 20px; top: 20px; }
         #timer-display { right: 20px; top: 20px; }
-        
+
         #adventure-hud { position: absolute; left: 20px; top: 20px; display: none; z-index: 10; }
         .hud-row { display: flex; align-items: center; gap: 15px; }
         #open-inv-btn { background: #487eb0; color: white; border: 3px solid #fff; font-size: 10px; padding: 12px 20px; border-radius: 12px; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.4); transition: transform 0.2s, background 0.2s; font-weight: 700; }
         #open-inv-btn:hover { transform: scale(1.05); background: #00a8ff; }
-        
+
         .pinned-money { background: #f1c40f; color: #2c3e50; font-weight: 700; font-size: 12px; padding: 10px 22px; border-radius: 50px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid #fff; cursor: pointer; transition: transform 0.2s, width 0.2s, background-color 0.2s; min-width: 80px; text-align: center; }
         .pinned-money:hover { transform: scale(1.08); background-color: #e1b12c; }
 
@@ -43,18 +47,18 @@
         .apple-rarity { font-size: 7px; font-weight: 900; text-align: center; margin-top: -7px; letter-spacing: .4px; }
         .inv-item-details { display:flex; flex-direction:column; gap:4px; min-width:0; }
         .inv-item-name { font-size:8px; line-height:1.5; overflow-wrap:anywhere; }
-        .inv-item-rarity { font-size:6px; font-weight:900; }
+        .inv-item-rarity { font-size:6px; font-weight:900; } 
         .rarity-common { color:#145A32; } .rarity-rare { color:#3498DB; } .rarity-epic { color:#B45BDE; }
         .rarity-godly { background:linear-gradient(90deg,#ff4242,#ffb52e,#fff15a,#47e66b,#48a9ff,#b75cff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
         .rarity-secret { color:#000; -webkit-text-fill-color:#000; background:none; text-shadow:1px 0 #fff,-1px 0 #fff,0 1px #fff,0 -1px #fff,1px 1px #fff,-1px -1px #fff,1px -1px #fff,-1px 1px #fff; }
         .rarity-admin { background:linear-gradient(90deg,#ff2626,#ffd21f); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-        
+
         .inv-item-card { background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255,255,255,0.15); border-radius: 25px; height: 90px; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; position: relative; overflow: hidden; transition: background 0.2s, border-color 0.2s; cursor: pointer; }
         .inv-item-card:hover { background: rgba(255, 255, 255, 0.18); border-color: rgba(255,255,255,0.4); }
         .inv-item-info { display: flex; align-items: center; gap: 15px; font-size: 14px; font-weight: 700; }
         .inv-item-icon-img { width: 45px; height: 45px; object-fit: contain; }
         .inv-item-count { font-size: 14px; color: #f5f6fa; }
-        
+
         .sell-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%) scale(0); background: #c23616; border: none; width: 45px; height: 45px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; box-shadow: 0 3px 8px rgba(0,0,0,0.3); z-index: 5; }
         .inv-item-card:hover .sell-btn { transform: translateY(-50%) scale(1); }
         .sell-btn:hover { background: #ea2027; transform: translateY(-50%) scale(1.1) !important; }
@@ -65,7 +69,7 @@
         .shop-item-img { width: 65px; height: 65px; object-fit: contain; margin-bottom: 5px; }
         .shop-item-duration { font-size: 10px; font-weight: 700; color: #dcdde1; }
         .shop-item-title { font-size: 11px; font-weight: 900; color: #fff; margin-bottom: 2px; }
-        
+
         .shop-item-price-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.2s; font-size: 12px; font-weight: 900; color: #f1c40f; pointer-events: none; }
         .shop-item-card:hover .shop-item-visual { filter: blur(3px); opacity: 0.3; }
         .shop-item-card:hover .shop-item-price-overlay { opacity: 1; }
@@ -90,7 +94,7 @@
 
         #msg-container-top { position: fixed; top: 60px; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10000; pointer-events: none; }
         #msg-container-bottom { position: fixed; bottom: 150px; left: 0; width: 100%; display: flex; flex-direction: column-reverse; align-items: center; z-index: 10000; pointer-events: none; }
-        .admin-msg { font-family: 'Nunito', sans-serif !important; font-size: 14px; font-weight: 700; text-align: center; text-shadow: 2px 2px 10px rgba(0,0,0,0.9); margin: 5px 0; width: 100%; }
+        .admin-msg { font-family: 'Google Sans', sans-serif !important; font-size: 14px; font-weight: 700; text-align: center; text-shadow: 2px 2px 10px rgba(0,0,0,0.9); margin: 5px 0; width: 100%; }
         .txt-violet { color: #A020F0; }
         .rainbow-text { background: linear-gradient(to right, #ff9999, #ffcc99, #ffff99, #99ff99, #99ccff, #cc99ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; filter: drop-shadow(0px 0px 2px rgba(255,255,255,0.3)); }
         .galaxy-text { background: linear-gradient(to right, #ffb3ff, #b3f0ff, #e6b3ff, #ffffff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; filter: drop-shadow(0px 0px 5px rgba(179,240,255,0.6)); }
@@ -119,7 +123,7 @@
         .home-content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; justify-content: center; }
         .home-header { position: absolute; top: 0; left: 0; width: 100%; height: 140px; display: flex; align-items: center; padding: 0 40px; box-sizing: border-box; }
         .logo-placeholder { font-size: 50px; background: rgba(241, 196, 15, 0.1); padding: 10px; border-radius: 12px; border: 2px dashed #f1c40f; position: absolute; left: 40px; }
-        .main-title { color: #f1c40f; font-family: 'Press Start 2P', cursive !important; font-size: 32px; line-height: 1.5; text-transform: uppercase; text-shadow: 4px 4px 0px #000; margin: 0 auto; text-align: center; white-space: nowrap; }
+        .main-title { color: #f1c40f; font-family: 'Google Sans', sans-serif !important; font-size: 32px; line-height: 1.5; text-transform: uppercase; text-shadow: 4px 4px 0px #000; margin: 0 auto; text-align: center; white-space: nowrap; }
 
         #account-settings-btn { position: absolute; right: 40px; top: 40px; background: #f1c40f; color: #000; border: 3px solid #f1c40f; width: 55px; height: 55px; border-radius: 15px; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.2s; z-index: 10; }
         #account-settings-btn:hover { transform: scale(1.1); background: #f39c12; }
@@ -133,7 +137,7 @@
         .acc-btn.danger:hover { background: #ea2027; }
 
         .modes-container { display: flex; gap: 60px; margin-top: 10px; }
-        .mode-card { width: 320px; height: 220px; background: #000000; border: 4px solid #f1c40f; border-radius: 20px; color: #f1c40f; display: flex; justify-content: center; align-items: center; font-family: 'Press Start 2P', cursive !important; font-size: 20px; text-align: center; cursor: pointer; position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(241, 196, 15, 0.2); transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
+        .mode-card { width: 320px; height: 220px; background: #000000; border: 4px solid #f1c40f; border-radius: 20px; color: #f1c40f; display: flex; justify-content: center; align-items: center; font-family: 'Google Sans', sans-serif !important; font-size: 20px; text-align: center; cursor: pointer; position: relative; overflow: hidden; box-shadow: 0 10px 25px rgba(241, 196, 15, 0.2); transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
         .mode-card:hover { transform: translateY(-10px) scale(1.03); border-color: #f39c12; box-shadow: 0 15px 35px rgba(241, 196, 15, 0.5); }
 
         .bottom-action-btn { position: absolute; bottom: 40px; width: 70px; height: 70px; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 6px 15px rgba(0,0,0,0.4); transition: transform 0.2s ease, background-color 0.2s ease; cursor: pointer; border: none; text-decoration: none; }
@@ -142,8 +146,8 @@
         .discord-btn-left { left: 40px; background-color: #f1c40f; }
         .discord-btn-left:hover { background-color: #f39c12; }
         .discord-btn-left img { border-radius: 50%; }
-        
-        .inv-title-text { font-family: 'Press Start 2P', cursive !important; font-size: 18px; margin: 0; color: #487eb0; }
+
+        .inv-title-text { font-family: 'Google Sans', sans-serif !important; font-size: 18px; margin: 0; color: #487eb0; }
 
         #home-screen { --u: clamp(0.3px, min(0.06944vw, 0.1111vh), 1.6px); }
 
@@ -181,6 +185,209 @@
         #account-settings-btn:hover { background: transparent; }
         #account-settings-btn img { width: 100%; height: 100%; object-fit: contain; display: block; }
     </style>
+    <style id="modern-theme">
+:root {
+    --bg: #0a0d14;
+    --surface: rgba(255, 255, 255, 0.06);
+    --surface-hover: rgba(255, 255, 255, 0.10);
+    --glass: rgba(12, 16, 26, 0.72);
+    --border: rgba(255, 255, 255, 0.10);
+    --text: #e8ecf4;
+    --muted: #8b95a8;
+    --accent: #7c5cff;
+    --accent-2: #22d3ee;
+    --money: #34d399;
+    --danger: #f43f5e;
+}
+
+*, *::before, *::after { font-family: 'Google Sans', sans-serif !important; }
+.main-title, .mode-card, .inv-title-text, #spawn-panel, #spawn-panel *, .admin-msg {
+    font-family: 'Google Sans', sans-serif !important;
+}
+
+body {
+    background: radial-gradient(1000px 600px at 20% 0%, rgba(124, 92, 255, 0.12), transparent 60%), var(--bg);
+    color: var(--text);
+    letter-spacing: -0.01em;
+}
+
+#score, #timer-display {
+    font-size: 15px; font-weight: 700; text-shadow: none;
+    background: var(--glass); border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 16px; backdrop-filter: blur(12px);
+}
+
+#home-screen {
+    border: none;
+    background:
+        radial-gradient(1200px 700px at 15% 10%, rgba(124, 92, 255, 0.22), transparent 60%),
+        radial-gradient(900px 600px at 90% 90%, rgba(34, 211, 238, 0.16), transparent 60%),
+        linear-gradient(180deg, #0a0d14, #0d1220);
+}
+#dvdCanvas { opacity: 0.35; }
+
+.logo-placeholder {
+    background: var(--surface); border: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+}
+.main-title {
+    font-weight: 800; letter-spacing: -0.03em; text-transform: none;
+    font-size: calc(44 * var(--u));
+    background: linear-gradient(90deg, #ffffff, #a5b4fc 50%, #67e8f9);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; text-shadow: none;
+}
+
+.mode-card {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+    border: 1px solid var(--border);
+    border-radius: calc(24 * var(--u));
+    color: var(--text); font-weight: 700; font-size: calc(24 * var(--u)); line-height: 1.35; letter-spacing: 0.02em;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(14px);
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+.mode-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(124, 92, 255, 0.7);
+    background: linear-gradient(145deg, rgba(124, 92, 255, 0.24), rgba(34, 211, 238, 0.08));
+    box-shadow: 0 24px 60px rgba(124, 92, 255, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
+#account-settings-btn:hover { transform: rotate(45deg) scale(1.05); }
+
+.discord-btn-left {
+    background-color: var(--surface); border: 1px solid var(--border);
+    backdrop-filter: blur(10px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.discord-btn-left:hover { background-color: rgba(124, 92, 255, 0.3); border-color: rgba(124, 92, 255, 0.6); }
+
+#leave-game-btn {
+    background: var(--glass); border: 1px solid var(--border); color: var(--text);
+    backdrop-filter: blur(10px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+#leave-game-btn:hover { background: rgba(244, 63, 94, 0.2); border-color: rgba(244, 63, 94, 0.6); }
+#leave-game-btn .leave-label { font-size: 11px; font-weight: 600; }
+
+.side-btn {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+    backdrop-filter: blur(12px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    transition: transform 0.2s, background 0.2s, border-color 0.2s;
+}
+.side-btn:hover { background: rgba(124, 92, 255, 0.28); border-color: rgba(124, 92, 255, 0.6); transform: translateX(4px) scale(1.04); }
+.side-btn img { filter: brightness(0) invert(1); opacity: 0.9; }
+.side-btn .side-btn-label { color: var(--text); font-size: 11px; font-weight: 600; }
+
+#money-display {
+    color: var(--money); font-size: 38px; font-weight: 800; letter-spacing: -0.02em;
+    -webkit-text-stroke: 0; text-shadow: 0 0 24px rgba(52, 211, 153, 0.35);
+    background: var(--glass); border: 1px solid var(--border); border-radius: 16px;
+    padding: 10px 20px; backdrop-filter: blur(10px);
+}
+
+#inventory-screen, #shop-screen, #index-screen {
+    background: rgba(10, 13, 20, 0.80); border: 1px solid var(--border); border-radius: 24px;
+    backdrop-filter: blur(24px) saturate(140%); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+.screen-header { border-bottom: 1px solid var(--border); }
+.inv-title-text { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.money-badge {
+    background: rgba(52, 211, 153, 0.12); color: var(--money); border: 1px solid rgba(52, 211, 153, 0.35);
+    box-shadow: none; font-size: 14px; font-weight: 700; padding: 8px 20px; border-radius: 999px;
+}
+.close-screen-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-size: 12px; font-weight: 600; border-radius: 10px; padding: 9px 16px; transition: background 0.2s, border-color 0.2s;
+}
+.close-screen-btn:hover { background: rgba(244, 63, 94, 0.22); border-color: rgba(244, 63, 94, 0.5); }
+
+.tab-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+    font-size: 12px; font-weight: 600; border-radius: 999px; padding: 8px 18px;
+}
+.tab-btn:hover { color: var(--text); background: var(--surface-hover); }
+.tab-btn.active { background: var(--accent); border-color: transparent; color: #fff; box-shadow: 0 6px 20px rgba(124, 92, 255, 0.4); }
+
+#inventory-grid, #shop-grid, #index-grid { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.2) transparent; }
+
+.inv-item-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; }
+.inv-item-card:hover { background: var(--surface-hover); border-color: rgba(124, 92, 255, 0.5); transform: translateY(-2px); }
+.inv-item-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.inv-item-rarity { font-size: 10px; font-weight: 700; }
+.inv-item-count { font-size: 13px; color: var(--muted); }
+.sell-btn { background: var(--danger); }
+.sell-btn:hover { background: #fb5272; }
+
+.rarity-common { color: #4ade80; }
+.rarity-rare { color: #60a5fa; }
+.rarity-epic { color: #c084fc; }
+
+.index-item-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; }
+.index-item-name { font-size: 13px; font-weight: 600; }
+.apple-rarity { font-size: 10px; font-weight: 700; margin-top: -2px; }
+
+.shop-item-card {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+    border: 1px solid var(--border); border-radius: 20px;
+    transition: border-color 0.2s, transform 0.2s;
+}
+.shop-item-card:hover { border-color: rgba(124, 92, 255, 0.6); transform: translateY(-3px); }
+.shop-item-title { font-size: 13px; font-weight: 700; }
+.shop-item-duration { font-size: 12px; font-weight: 500; color: var(--muted); }
+.shop-item-price-overlay { font-size: 18px; font-weight: 800; color: var(--money); background: rgba(10, 13, 20, 0.55); }
+
+#custom-confirm-modal, #sell-modal, #account-modal { background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(6px); }
+.confirm-box, .sell-box, #account-panel {
+    background: rgba(17, 22, 35, 0.94); border: 1px solid var(--border); border-radius: 20px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+.confirm-msg { font-size: 14px; font-weight: 600; line-height: 1.6; }
+.confirm-btn { font-size: 12px; font-weight: 600; border-radius: 10px; padding: 10px 24px; }
+.confirm-btn.yes { background: var(--accent); }
+.confirm-btn.yes:hover { background: #6d4cf0; }
+.confirm-btn.no { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.confirm-btn.no:hover { background: rgba(244, 63, 94, 0.25); }
+
+.sell-box h3 { font-size: 15px; font-weight: 700; }
+.sell-input { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border); border-radius: 10px; font-size: 14px; color: var(--text); }
+.sell-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.25); }
+.sell-hint { font-size: 11px; font-style: normal; color: var(--muted); }
+
+#account-select { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border); font-size: 13px; border-radius: 10px; }
+.acc-btn { background: var(--accent); font-size: 12px; font-weight: 600; border-radius: 8px; padding: 8px 14px; }
+.acc-btn:hover { background: #6d4cf0; }
+.acc-btn.danger { background: rgba(244, 63, 94, 0.85); }
+.acc-btn.danger:hover { background: var(--danger); }
+
+.event-card { background: var(--glass); border: 1px solid var(--border); border-radius: 16px; backdrop-filter: blur(12px); }
+.event-timer { font-size: 13px; font-weight: 700; }
+#spawn-panel {
+    background: var(--glass); border: 1px solid var(--border); border-radius: 16px;
+    backdrop-filter: blur(12px); font-size: 13px; padding: 8px 16px;
+}
+.spawn-label { color: var(--muted); font-weight: 500; }
+
+    .top-panel { position: fixed; top: calc(20 * var(--u)); z-index: 5; display: flex; align-items: center; box-sizing: border-box;
+  height: calc(76 * var(--u)); padding: 0 calc(18 * var(--u)); border-radius: calc(18 * var(--u)); background: rgba(61,59,95,.85);
+  border: 1px solid rgba(255,255,255,.12); box-shadow: 0 6px 18px rgba(0,0,0,.35); backdrop-filter: blur(10px); }
+#top-left-panel { left: calc(20 * var(--u)); gap: calc(18 * var(--u)); }
+#top-right-panel { right: calc(20 * var(--u)); flex-direction: column; justify-content: center; align-items: flex-start; gap: calc(6 * var(--u)); }
+.tp-col { display: flex; flex-direction: column; gap: calc(8 * var(--u)); }
+.tp-row { display: flex; align-items: center; gap: calc(10 * var(--u)); color: #fff; text-decoration: none; cursor: pointer; }
+.tp-txt { font-size: calc(12 * var(--u)); font-weight: 600; line-height: 1; white-space: nowrap; }
+.tp-joy { width: calc(40 * var(--u)); height: calc(40 * var(--u)); object-fit: contain; cursor: default; }
+.tp-ico, .mc-ico { object-fit: contain; display: block; filter: invert(1); transition: transform .18s ease; }
+.tp-ico { width: calc(20 * var(--u)); height: calc(20 * var(--u)); }
+.tp-row:hover .tp-ico { transform: scale(1.25); }
+.tp-sep-v { width: calc(2 * var(--u)); height: calc(40 * var(--u)); background: #fff; }
+.tp-sep-h { align-self: stretch; height: calc(2 * var(--u)); background: #fff; }
+.mode-card { gap: calc(18 * var(--u)); }
+.mc-ico { width: calc(56 * var(--u)); height: calc(56 * var(--u)); }
+.mode-card:hover .mc-ico { transform: scale(1.18); }
+.mc-sep { width: calc(2 * var(--u)); height: calc(76 * var(--u)); background: #fff; }
+#money-hud, #money-hud *, .money-badge, .money-badge * { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif !important; }
+
+    </style>
 </head>
 <body>
 
@@ -188,23 +395,31 @@
         <canvas id="dvdCanvas"></canvas>
         <div class="home-content">
             <div class="home-header">
-                <div class="logo-placeholder">🕹️</div> 
+                <div class="top-panel" id="top-left-panel">
+                    <img class="tp-joy" src="icons/Fast%20Collect%20Challenge%20NBG%20logo.png" alt="">
+                    <span class="tp-sep-v"></span>
+                    <div class="tp-col">
+                        <div class="tp-row" onclick="openAccountModal()"><img class="tp-ico" src="icons/Account%20Dark%20Mode.png" alt=""><span class="tp-txt">Your Account</span></div>
+                        <a class="tp-row" href="https://discord.gg/52UY26TBQF" target="_blank"><img class="tp-ico" src="icons/Discord%20Dark%20Mode.png" alt=""><span class="tp-txt">Join our Discord</span></a>
+                    </div>
+                </div>
+                <div class="top-panel" id="top-right-panel">
+                    <a class="tp-row" href="https://how2play.fastcollectchallenge.com" target="_blank" rel="noopener"><img class="tp-ico" src="icons/Help%20Dark%20Mode.png" alt=""><span class="tp-txt">How to play</span></a>
+                    <span class="tp-sep-h"></span>
+                    <a class="tp-row" href="https://privacy-policy.fastcollectchallenge.com" target="_blank" rel="noopener"><img class="tp-ico" src="icons/Privacy%20Policy%20Dark%20Mode.png" alt=""><span class="tp-txt">Privacy Policy</span></a>
+                </div>
                 <h1 class="main-title">Fast Collect Challenge</h1>
-                <button id="account-settings-btn" onclick="openAccountModal()"><img src="icons/settings.png" alt="Settings" onerror="this.replaceWith(document.createTextNode('⚙️'))"></button>
             </div>
             <div class="modes-container">
-                <div class="mode-card" onclick="startAdventure()">ADVENTURE<br>MODE</div>
-                <div class="mode-card" onclick="startGame()">ARCADE<br>MODE</div>
+                <div class="mode-card" onclick="startAdventure()"><span class="mc-text">Adventure<br>Mode</span><img class="mc-ico" src="icons/Adventure%20Mode%20Compass%20Dark%20Mode.png" alt=""></div>
+                <div class="mode-card" onclick="startGame()"><span class="mc-text">Arcade<br>Mode</span><img class="mc-ico" src="icons/Arcade%20Mode%20Timer%20Dark%20Mode.png" alt=""></div>
             </div>
-            <a href="https://discord.gg/52UY26TBQF" target="_blank" class="bottom-action-btn discord-btn-left">
-                <img src="icons/discord.jpg" alt="Discord">
-            </a>
         </div>
     </div>
 
     <div id="account-modal">
         <div id="account-panel">
-            <div style="font-weight: 700; font-size: 11px; color: #7ed6df;">👤 ADVENTURE ACCOUNTS</div>
+            <div style="font-weight: 700; font-size: 14px; color: #a5b4fc;">👤 ADVENTURE ACCOUNTS</div>
             <select id="account-select" onchange="switchAccount(this.value)"></select>
             <div style="margin-bottom: 15px;">
                 <button class="acc-btn" onclick="createNewAccount()">+ New</button>
@@ -224,7 +439,7 @@
         <div class="spawn-row"><span class="spawn-label">Latest good spawn</span><span class="spawn-icons" id="spawn-latest-good"></span></div>
         <div class="spawn-row"><span class="spawn-label">Best spawn</span><span class="spawn-icons" id="spawn-best"></span></div>
     </div>
-    
+
     <div id="adventure-hud">
         <div id="money-hud">
             <div id="money-display">$<span id="pinned-money-counter">0</span></div>
@@ -247,16 +462,16 @@
     <div id="shop-screen">
         <div class="screen-header">
             <div class="money-badge">$ <span id="shop-money-counter">0</span></div>
-            <h2 class="inv-title-text" style="color: #f1c40f;">🏪 SHOP</h2>
+            <h2 class="inv-title-text">🏪 SHOP</h2>
             <button class="close-screen-btn" onclick="toggleShop(false)">Close ✖</button>
         </div>
-        <div style="font-family: 'Press Start 2P', cursive !important; font-size: 16px; text-align: center; margin-bottom: 20px; color: #7ed6df;">Luck Potions</div>
+        <div style="font-size: 15px; font-weight: 600; text-align: center; margin-bottom: 20px; color: #a5b4fc;">Luck Potions</div>
         <div id="shop-grid"></div>
     </div>
 
     <div id="index-screen">
         <div class="screen-header">
-            <h2 class="inv-title-text" style="color: #f1c40f;">📖 INDEX</h2>
+            <h2 class="inv-title-text">📖 INDEX</h2>
             <button class="close-screen-btn" onclick="toggleIndex(false)">Close ✖</button>
         </div>
         <div id="index-grid"></div>
@@ -287,18 +502,18 @@
     <div id="msg-container-top"></div>
     <div id="msg-container-bottom"></div>
     <div id="hud-events"></div>
-    
+
     <button id="leave-game-btn" onclick="leaveGame()"><span class="leave-icon">🕹️</span><span class="leave-label">Leave?</span></button>
     <div id="side-buttons">
-        <button id="inv-btn" class="side-btn" onclick="toggleInventory(true)"><img src="icons/inventory.png" alt="Inventory" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Inventory</span></button>
-        <button id="shop-btn" class="side-btn" onclick="toggleShop(true)"><img src="icons/shop.png" alt="Shop" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Shop</span></button>
-        <button id="index-btn" class="side-btn" onclick="toggleIndex(true)"><img src="icons/index.png" alt="Index" onerror="this.style.display=\'none\'; this.parentNode.classList.add(\'no-img\')"><span class="side-btn-label">Index</span></button>
+        <button id="inv-btn" class="side-btn" onclick="toggleInventory(true)"><img src="https://cdn-icons-png.flaticon.com/512/3313/3313637.png" alt="Inventory" onerror="this.style.display='none'; this.parentNode.classList.add('no-img')"><span class="side-btn-label">Inventory</span></button>
+        <button id="shop-btn" class="side-btn" onclick="toggleShop(true)"><img src="https://cdn-icons-png.flaticon.com/512/126/126122.png" alt="Shop" onerror="this.style.display='none'; this.parentNode.classList.add('no-img')"><span class="side-btn-label">Shop</span></button>
+        <button id="index-btn" class="side-btn" onclick="toggleIndex(true)"><img src="https://static.thenounproject.com/png/176559-200.png" alt="Index" onerror="this.style.display='none'; this.parentNode.classList.add('no-img')"><span class="side-btn-label">Index</span></button>
     </div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const MY_CLIENT_ID = 'p_' + Math.random().toString(36).slice(2, 10);
-        const ably = new Ably.Realtime({ key: 'bZFMkw.u1oLTg:xhXyW5SeGGYAmDyoGjYDfkbodtDNkZcEMXw11__DDxM', clientId: MY_CLIENT_ID });
+        const ably = new Ably.Realtime({ key: 'bZFMkw.c4CcvA:p68kSKR0er684kwyolnwIhYxTf0e4ed5NDanEKxGxGo', clientId: MY_CLIENT_ID });
         const channel = ably.channels.get('admin-commands');
         function setMode(mode) { window.__fcMode = mode;
             try { channel.presence.update({ mode: mode, user: window.__fcUser || '' }, function(err){ if (err) console.error('[Fast Collect] presence failed:', err.message || err); else console.log('[Fast Collect] presence OK as', MY_CLIENT_ID, '-', mode); }); } catch(e) { console.error(e); }
@@ -334,18 +549,18 @@
             return sec === 0 ? (m + "min") : (m + "m " + sec + "s");
         }
 
-        function resize() { 
-            canvas.width = window.innerWidth; canvas.height = window.innerHeight; 
+        function resize() {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
             dvdCanvas.width = window.innerWidth; dvdCanvas.height = window.innerHeight;
         }
-        window.addEventListener('resize', resize); 
+        window.addEventListener('resize', resize);
 
         let timeLeft = 60, gameActive = false, score = 0, scoreMult = 1, appleMultiplier = 1;
         let currentGameMode = "arcade";
-        let luckMultiplier = 1; 
-        let currentLuck = 0.05; 
+        let luckMultiplier = 1;
+        let currentLuck = 0.05;
         let activeTimers = {}, player = { x: canvas.width / 2, y: canvas.height / 2 };
-        
+
         const BASE_BALL_SPEED = 2.5 * 1.5;
         let ball = { x: 100, y: 100, speed: BASE_BALL_SPEED, baseSpeed: BASE_BALL_SPEED, emoji: "🏐" };
         let apples = [];
@@ -372,7 +587,7 @@
             sapphire: "apples/sapphire.png", canneloni: "apples/Canneloni%20Apple.png", rainbow: "apples/Rainbow%20Apple.png", ice: "apples/Ice%20Apple.png"
         });
         Object.assign(IMG_FRUITS, {
-            skull: "apples/Skull%20Apple.png", poisoned: "apples/Poisoned%20apple.png", frostfire: "apples/Frostfire%20apple.png", elixir: "apples/Elixir%20Apple.png", corrupted: "apples/Corrupted%20Apple.png", ghost: "apples/Ghost%20Apple.png", pumpkini: "apples/Pumpkin%20apple.png", sun: "apples/Sun%20apple.png"
+        skull: "apples/Skull%20Apple.png", poisoned: "apples/Poisoned%20apple.png", frostfire: "apples/Frostfire%20apple.png", elixir: "apples/Elixir%20Apple.png",            corrupted: "apples/Corrupted%20Apple.png", ghost: "apples/Ghost%20Apple.png", pumpkini: "apples/Pumpkin%20apple.png", sun: "apples/Sun%20apple.png"
         });
         const NEW_APPLES = {
             cheezy:    { field:'cheezyApples',    name:'Cheezy Apple',    price:5000,      chance:0.0004,     color:'#FFC93C', msg:'A Cheezy Apple spawned in your server!' },
@@ -383,7 +598,7 @@
             rainbow:   { field:'rainbowApples',   name:'Rainbow Apple',   price:3000000,   chance:0.0000017,  color:'#ff66cc', msg:'A Rainbow Apple spawned in your server!', rainbow:true },
             canneloni: { field:'canneloniApples',name:'Apple Canneloni', price:250000000, chance:0.00000002, color:'#E4572E', msg:'An Apple Canneloni spawned in your server!' }
         };
-        Object.assign(NEW_APPLES, {
+                Object.assign(NEW_APPLES, {
             skull:     { field:'skullApples',     name:'Skull Apple',       price:20000,     chance:0, color:'#d9d9d9', msg:'A Skull Apple spawned in your server!' },
             poisoned:  { field:'poisonedApples',  name:'Poisoned Apple',    price:70000,     chance:0, color:'#7bd94a', msg:'A Poisoned Apple spawned in your server!' },
             frostfire: { field:'frostfireApples', name:'Frostfire Apple',   price:150000,    chance:0, color:'#5fd4ff', msg:'A Frostfire Apple spawned in your server!' },
@@ -393,7 +608,6 @@
             pumpkini:  { field:'pumpkiniApples',  name:'Pumpkini Appelini', price:32000000,  chance:0, color:'#ff8a1f', msg:'A Pumpkini Appelini spawned in your server!' },
             sun:       { field:'sunApples',       name:'Sun Apple',         price:170000000, chance:0, color:'#ffd23f', msg:'A Sun Apple spawned in your server!' }
         });
-        
         const APPLE_ORDER = ['red', 'green', 'golden', 'diamond', 'candy', 'lava', 'galaxy', 'dark', 'cheezy', 'moony', 'sand', 'amethyst', 'ice', 'salhini', 'sapphire', 'rainbow', 'bloodmoon', 'canneloni'];
         APPLE_ORDER.push('skull', 'poisoned', 'frostfire', 'elixir', 'corrupted', 'ghost', 'pumpkini', 'sun');
         const APPLE_NAMES = { red: 'Red Apple', green: 'Green Apple', golden: 'Golden Apple', diamond: 'Diamond Apple', candy: 'Candy Apple', lava: 'Lava Apple', galaxy: 'Galaxy Apple', dark: 'Dark Apple', moony: 'Moony Apple', salhini: 'Salhini Appelini', bloodmoon: 'Bloodmoon Apple' };
@@ -418,7 +632,7 @@
             15: "https://static.wikia.nocookie.net/stealabr/images/0/0a/15x.png/revision/latest/scale-to-width/360?cb=20251222183115",
             20: "https://static.wikia.nocookie.net/stealabr/images/b/b7/20x_Luck.png/revision/latest/scale-to-width/360?cb=20260207171434",
             25: "https://static.wikia.nocookie.net/stealabr/images/e/ea/25x_Luck.png/revision/latest/scale-to-width/360?cb=20260317140953",
-            30: "GUI/30x luck.png",
+            30: "GUI/30x%20luck.png",
             35: "https://static.wikia.nocookie.net/stealabr/images/9/96/35x_Luck.png/revision/latest/scale-to-width/360?cb=20260719014843" };
 
         const SHOP_PRODUCTS = [
@@ -438,13 +652,13 @@
 
         let accounts = { "Default": { money: 0, redApples: 0, greenApples: 0, goldenApples: 0, diamondApples: 0, candyApples: 0, lavaApples: 0, galaxyApples: 0, darkApples: 0, salhiniApples: 0, bloodmoonApples: 0, moonyApples: 0, potions: {} } };
         let currentAccountName = "Default";
-        let activeSellType = null; 
+        let activeSellType = null;
 
         function showCustomConfirm(message, callback) {
             document.getElementById("custom-confirm-message").innerText = message;
             const modal = document.getElementById("custom-confirm-modal");
             modal.style.display = "flex";
-            
+
             const cleanListeners = () => {
                 document.getElementById("custom-confirm-yes-btn").onclick = null;
                 document.getElementById("custom-confirm-no-btn").onclick = null;
@@ -493,7 +707,7 @@
                 });
                 accounts = parsed;
             }
-            if (savedActive && accounts[savedActive]) { currentAccountName = savedActive; } 
+            if (savedActive && accounts[savedActive]) { currentAccountName = savedActive; }
             else { currentAccountName = Object.keys(accounts)[0] || "Default"; }
             renderAccountSelect(); updateAdventureHUD();
         }
@@ -555,9 +769,9 @@
             sanitizeAccount(activeData, currentAccountName);
             document.getElementById("inv-money-counter").innerText = fmtNum(activeData.money);
             document.getElementById("shop-money-counter").innerText = fmtNum(activeData.money);
-            
+
             document.getElementById("pinned-money-counter").innerText = fmtNum(activeData.money);
-            
+
             const grid = document.getElementById("inventory-grid"); grid.innerHTML = "";
 
             if (currentInventoryTab === "apples") {
@@ -608,13 +822,13 @@
 
         function toggleInventory(show) {
             const invScreen = document.getElementById("inventory-screen");
-            if (show) { toggleShop(false); updateAdventureHUD(); invScreen.style.display = "flex"; gameActive = false; } 
+            if (show) { toggleShop(false); updateAdventureHUD(); invScreen.style.display = "flex"; gameActive = false; }
             else { invScreen.style.display = "none"; gameActive = true; update(); }
         }
 
         function toggleShop(show) {
             const shopScreen = document.getElementById("shop-screen");
-            if (show) { toggleInventory(false); toggleIndex(false); renderShopGrid(); shopScreen.style.display = "flex"; gameActive = false; } 
+            if (show) { toggleInventory(false); toggleIndex(false); renderShopGrid(); shopScreen.style.display = "flex"; gameActive = false; }
             else { shopScreen.style.display = "none"; gameActive = true; update(); }
         }
 
@@ -668,7 +882,7 @@
         function buyPotion(product) {
             const activeData = accounts[currentAccountName]; if (!activeData) return;
             if (activeData.money < product.price) { alert("You don't have enough money to buy this potion!"); return; }
-            
+
             showCustomConfirm("Are you sure you want to buy this potion?", (accepted) => {
                 if (accepted) {
                     activeData.money -= product.price;
@@ -708,10 +922,10 @@
                 if (accepted) {
                     activeData.potions[potionId]--;
                     saveAllAccounts();
-                    
+
                     luckMultiplier = product.multiplier;
                     currentLuck = ((currentGameMode === "adventure") ? 0.20 : 0.05) * luckMultiplier;
-                    
+
                     showAdvancedMsg(`You activated Potion ${product.multiplier}x luck!`, 'bottom', getLuckStyle(product.multiplier));
                     startHudTimer('luck', LUCK_IMAGES[product.multiplier] || IMG_POTIONS[product.type], product.duration, "🍀", () => {
                         luckMultiplier = 1;
@@ -759,7 +973,7 @@
 
             if (NEW_APPLES[activeSellType]) { currentStock = activeData[NEW_APPLES[activeSellType].field] || 0; unitPrice = NEW_APPLES[activeSellType].price; }
             let amountToSell = 0;
-            if (inputVal.toLowerCase() === 'max') { amountToSell = currentStock; } 
+            if (inputVal.toLowerCase() === 'max') { amountToSell = currentStock; }
             else {
                 let parsedInt = parseInt(inputVal); if (isNaN(parsedInt) || parsedInt <= 0) { alert("Please enter a valid amount or type 'Max'."); return; }
                 amountToSell = parsedInt > currentStock ? currentStock : parsedInt;
@@ -780,14 +994,14 @@
             else if (activeSellType === 'moony') activeData.moonyApples -= amountToSell;
 
             if (NEW_APPLES[activeSellType]) activeData[NEW_APPLES[activeSellType].field] -= amountToSell;
-            activeData.money += (amountToSell * unitPrice); saveAllAccounts(); closeSellModal(); updateAdventureHUD(); 
+            activeData.money += (amountToSell * unitPrice); saveAllAccounts(); closeSellModal(); updateAdventureHUD();
         }
 
         let dvdApple = { x: 100, y: 100, dx: 4, dy: 4, size: 120 };
         function updateDvdApple() {
             if (gameActive) return;
             dvdCtx.clearRect(0, 0, dvdCanvas.width, dvdCanvas.height);
-            
+
             dvdApple.x += dvdApple.dx;
             dvdApple.y += dvdApple.dy;
 
@@ -820,47 +1034,48 @@
         }
 
         function startGame() {
-            currentGameMode = "arcade"; luckMultiplier = 1; currentLuck = 0.05; setSpawnPanel(false); setMode('arcade'); 
+            currentGameMode = "arcade"; luckMultiplier = 1; currentLuck = 0.05; setSpawnPanel(false); setMode('arcade');
             document.getElementById("home-screen").style.display = "none";
             document.getElementById("score").style.display = "block"; document.getElementById("timer-display").style.display = "block";
             document.getElementById("adventure-hud").style.display = "none"; document.getElementById("leave-game-btn").style.display = "flex"; document.getElementById("side-buttons").style.display = "none";
             score = 0; timeLeft = 60; document.getElementById("score").innerText = "Score: " + fmtNum(score); document.getElementById("timer-display").innerText = "Timer: " + timeLeft;
-            gameActive = true; apples = []; ball.speed = ball.baseSpeed; 
-            
-            spawnApple(false, 5); 
-            
+            gameActive = true; apples = []; ball.speed = ball.baseSpeed;
+
+            spawnApple(false, 5);
+
             update(); countdown();
             if (gameSpawnInterval) clearInterval(gameSpawnInterval);
             gameSpawnInterval = setInterval(() => { if(gameActive && currentGameMode === "arcade") spawnApple(false, 1); }, 1000);
         }
 
         function startAdventure() {
-            currentGameMode = "adventure"; luckMultiplier = 1; currentLuck = 0.20; resetSpawnPanel(); setSpawnPanel(true); 
+            currentGameMode = "adventure"; luckMultiplier = 1; currentLuck = 0.20; resetSpawnPanel(); setSpawnPanel(true);
             document.getElementById("home-screen").style.display = "none";
             document.getElementById("score").style.display = "none"; document.getElementById("timer-display").style.display = "none";
             document.getElementById("adventure-hud").style.display = "block"; document.getElementById("leave-game-btn").style.display = "flex"; document.getElementById("side-buttons").style.display = "flex";
-            updateAdventureHUD(); gameActive = true; apples = []; ball.speed = ball.baseSpeed; 
-            
-            spawnApple(false, 5); 
-            
-            update(); 
-            if (gameSpawnInterval) clearInterval(gameSpawnInterval);
-            gameSpawnInterval = setInterval(() => { if(gameActive && currentGameMode === "adventure") spawnApple(false, 1); }, 1000);
+            updateAdventureHUD(); gameActive = true; apples = []; ball.speed = ball.baseSpeed;
+
+            update();
+            if (gameSpawnInterval) { clearInterval(gameSpawnInterval); gameSpawnInterval = null; }
+            // Adventure : les apparitions (et ce que le joueur gagne) viennent du serveur, voir firebase-trade.js
+            if (window.advStart) window.advStart();
             setMode('adventure');
         }
 
         channel.unsubscribe();
         channel.subscribe((msg) => {
-            const d = msg.data; if (!gameActive) return; 
-            if (msg.name === 'luck') { 
+            const d = msg.data; if (!gameActive) return;
+            // en Adventure, chance / apparitions / points sont gérés par le serveur : ces événements n'ont plus d'effet ici
+            if (currentGameMode === "adventure" && ['luck','customLuck','customSpawn','greentime','doublepoints','spawn','spawnGolden','spawnDiamond','spawnCandy','clearLuck'].includes(msg.name)) return;
+            if (msg.name === 'luck') {
                 luckMultiplier = d.mult; currentLuck = ((currentGameMode === "adventure") ? 0.20 : 0.05) * luckMultiplier;
-                showAdvancedMsg(`FelixRouge activated ${d.mult}x luck!`, 'bottom', getLuckStyle(d.mult)); 
-                startHudTimer('luck', LUCK_IMAGES[d.mult], d.time, "🍀", () => { luckMultiplier = 1; currentLuck = (currentGameMode === "adventure") ? 0.20 : 0.05; }); 
+                showAdvancedMsg(`FelixRouge activated ${d.mult}x luck!`, 'bottom', getLuckStyle(d.mult));
+                startHudTimer('luck', LUCK_IMAGES[d.mult], d.time, "🍀", () => { luckMultiplier = 1; currentLuck = (currentGameMode === "adventure") ? 0.20 : 0.05; });
             }
 
             if (msg.name === 'customLuck') {
                 luckMultiplier = d.mult; currentLuck = ((currentGameMode === "adventure") ? 0.20 : 0.05) * luckMultiplier;
-                const luckUrl = "GUI/30x luck.png";
+                const luckUrl = "https://static.wikia.nocookie.net/stealabr/images/0/09/30x_Luck.webp/revision/latest/scale-to-width/360?cb=20260515140747";
                 if (LUCK_IMAGES[d.mult]) { showAdvancedMsg("FelixRouge activated " + d.mult + "x luck for " + fmtTime(d.time) + "!", 'bottom', getLuckStyle(d.mult)); }
                 else { showAdvancedMsg("<span style='color: #ff3838; font-weight: 900;'>FelixRouge</span> activated " + d.mult + "x luck for " + fmtTime(d.time) + "!", 'bottom', {color: 'white'}); }
                 startHudTimer('custom_luck', LUCK_IMAGES[d.mult] || luckUrl, d.time, "🍀", () => { luckMultiplier = 1; currentLuck = (currentGameMode === "adventure") ? 0.20 : 0.05; });
@@ -869,8 +1084,8 @@
             if (msg.name === 'customSpawn' && currentGameMode === "adventure") {
                 if (Array.isArray(d.targets) && !d.targets.includes(MY_CLIENT_ID)) return;
                 const appleType = d.type.toLowerCase(); spawnAppleAdmin(appleType, d.targets ? 1 : (d.count || 1));
-                if (appleType === 'lava') { showAdvancedMsg("<span style='color: #ff3838; font-weight: 900;'>FelixRouge</span> spawned a Lava Apple in your server!", 'bottom', {color: '#FF4D00'}); } 
-                else if (appleType === 'galaxy') { showAdvancedMsg("<span style='color: #ff3838; font-weight: 900;'>FelixRouge</span> spawned a Galaxy Apple in your server!", 'bottom', {isGalaxy: true}); } 
+                if (appleType === 'lava') { showAdvancedMsg("<span style='color: #ff3838; font-weight: 900;'>FelixRouge</span> spawned a Lava Apple in your server!", 'bottom', {color: '#FF4D00'}); }
+                else if (appleType === 'galaxy') { showAdvancedMsg("<span style='color: #ff3838; font-weight: 900;'>FelixRouge</span> spawned a Galaxy Apple in your server!", 'bottom', {isGalaxy: true}); }
                 else if (appleType === 'dark') { showAdvancedMsg("<span style='color: #ff3838; font-weight: 900;'>FelixRouge</span> spawned a Dark Apple in your server!", 'bottom', {color: 'black'}); }
                 else if (appleType === 'salhini') { showAdvancedMsg("A Salhini Appelini spawned in your server!", 'bottom', {color: '#F5D7C3'}); }
                 else if (appleType === 'bloodmoon') { showAdvancedMsg("A Bloodmoon apple spawned in your server!", 'bottom', {color: '#8b0000'}); }
@@ -878,25 +1093,25 @@
                 else if (appleType === 'moony') { showAdvancedMsg("A Moony Apple spawned in your server!", 'bottom', {stops: ['#BFC1C2', '#F8F8F8', '#9EA0A2', '#ECECEC']}); }
             }
 
-            if (msg.name === 'greentime') { 
-                let oldL = currentLuck; currentLuck = 1.0; 
-                showAdvancedMsg(`FelixRouge activated <span class="txt-violet">Green time</span>!`, 'bottom', getGTStyle(d.time)); 
-                startHudTimer('gt', "https://static.vecteezy.com/system/resources/previews/016/733/263/non_2x/cute-illustration-of-a-green-apple-in-cartoon-style-on-isolated-background-vector.jpg", d.time, "🍏", () => { currentLuck = oldL; }); 
+            if (msg.name === 'greentime') {
+                let oldL = currentLuck; currentLuck = 1.0;
+                showAdvancedMsg(`FelixRouge activated <span class="txt-violet">Green time</span>!`, 'bottom', getGTStyle(d.time));
+                startHudTimer('gt', "https://static.vecteezy.com/system/resources/previews/016/733/263/non_2x/cute-illustration-of-a-green-apple-in-cartoon-style-on-isolated-background-vector.jpg", d.time, "🍏", () => { currentLuck = oldL; });
             }
             if (msg.name === 'doublepoints') { scoreMult = 2; appleMultiplier = 2; showAdvancedMsg(`FelixRouge activated <span class="txt-violet">Double Points</span>!`, 'bottom', {isRainbow: true}); startHudTimer('dp', "https://fridg-front.s3.amazonaws.com/media/CACHE/images/products/lot-de-2-pommes-fuji_fEa1aJa/8e7b583a2aa9503e79230ddfaf062316.jpg", d.time, "🍎", () => { scoreMult = 1; appleMultiplier = 1; }); }
-            
+
             if (msg.name === 'spawn') { spawnAppleAdmin('green', d.count); showAdvancedMsg(`FelixRouge spawned ${d.count} Green Apples!`, 'bottom', getSStyle(d.count)); }
             if (msg.name === 'spawnGolden' && currentGameMode === "adventure") { spawnAppleAdmin('golden', d.count); let gColor = '#ffff00'; if(d.count === 3) gColor = '#A020F0'; if(d.count === 5) gColor = '#000000'; showAdvancedMsg(`FelixRouge spawned ${d.count} Golden Apples!`, 'bottom', {color: gColor}); }
             if (msg.name === 'spawnDiamond' && currentGameMode === "adventure") { spawnAppleAdmin('diamond', d.count); let dColor = '#ffff00'; if(d.count === 2) dColor = '#A020F0'; if(d.count === 3) dColor = '#000000'; showAdvancedMsg(`FelixRouge spawned ${d.count} Diamond Apples!`, 'bottom', {color: dColor}); }
             if (msg.name === 'spawnCandy' && currentGameMode === "adventure") { spawnAppleAdmin('candy', d.count); showAdvancedMsg(`FelixRouge spawned ${d.count} Candy Apple!`, 'bottom', {isRainbow: true}); }
-            
+
             if (msg.name === 'ballSpeed') { ball.baseSpeed = BASE_BALL_SPEED * d.mult; ball.speed = ball.baseSpeed; showAdvancedMsg(`FelixRouge set ball speed to x${d.mult}`, 'bottom', d.mult >= 2 ? {color:'black'} : {color:'white'}); }
             if (msg.name === 'announce') showAdvancedMsg(d.text, 'top', {color: 'white'});
-            if (msg.name === 'clearLuck') { 
-                luckMultiplier = 1; currentLuck = (currentGameMode === "adventure") ? 0.20 : 0.05; scoreMult = 1; appleMultiplier = 1; 
-                Object.keys(activeTimers).forEach(id => { clearInterval(activeTimers[id].interval); let c = document.getElementById('event-'+id); if(c) c.remove(); delete activeTimers[id]; }); 
+            if (msg.name === 'clearLuck') {
+                luckMultiplier = 1; currentLuck = (currentGameMode === "adventure") ? 0.20 : 0.05; scoreMult = 1; appleMultiplier = 1;
+                Object.keys(activeTimers).forEach(id => { clearInterval(activeTimers[id].interval); let c = document.getElementById('event-'+id); if(c) c.remove(); delete activeTimers[id]; });
             }
-            
+
             if (msg.name === 'reset') {
                 ball.speed = ball.baseSpeed * 3; showAdvancedMsg("Ball Speed set to x3 due to imminent server reseting", 'bottom', {isRainbow: true}); let rTime = 5;
                 const containerTop = document.getElementById('msg-container-top'); const resetDiv = document.createElement('div'); resetDiv.className = 'admin-msg'; resetDiv.style.color = '#ff4757'; resetDiv.innerHTML = `⚠️SERVERS RESET IN ${rTime}s`; containerTop.appendChild(resetDiv);
@@ -905,12 +1120,12 @@
         });
 
         function getLuckStyle(m) { if(m==2) return {color:'#32CD32'}; if(m==4) return {color:'#DAA520'}; if(m==6) return {color:'#DA70D6'}; if(m==8) return {isRainbow:true}; if(m==10) return {color:'black'};
-            if(m==12) return {stops:['#000000','#FFD700']};                 
-            if(m==15) return {stops:['#FF2D2D','#32CD32']};                 
-            if(m==20) return {color:'#FF69B4'};                             
-            if(m==25) return {stops:['#32CD32','#32CD32','#FFD700']};       
-            if(m==30) return {stops:['#FF2D2D','#FF8C00']};                 
-            if(m==35) return {stops:['#1ECBE1','#1ECBE1','#F6D365']};       
+            if(m==12) return {stops:['#000000','#FFD700']};
+            if(m==15) return {stops:['#FF2D2D','#32CD32']};
+            if(m==20) return {color:'#FF69B4'};
+            if(m==25) return {stops:['#32CD32','#32CD32','#FFD700']};
+            if(m==30) return {stops:['#FF2D2D','#FF8C00']};
+            if(m==35) return {stops:['#1ECBE1','#1ECBE1','#F6D365']};
             return {color:'white'}; }
         function getGTStyle(s) { if(s==5) return {color:'#32CD32'}; if(s==10) return {color:'#DAA520'}; if(s==15) return {color:'#DA70D6'}; if(s==20) return {isRainbow:true}; if(s==30) return {color:'black'}; return {color:'white'}; }
         function getTStyle(s) { if(s==10) return {color:'#32CD32'}; if(s==15) return {color:'#DAA520'}; if(s==20) return {color:'#DA70D6'}; if(s>=30) return {isRainbow:true}; return {color:'white'}; }
@@ -939,9 +1154,9 @@
         }
 
         const GOOD_SPAWN_MIN_RANK = APPLE_ORDER.indexOf('lava');
-        const LATEST_SPAWN_LIMIT = 2;      
-        const LATEST_GOOD_SPAWN_LIMIT = 1; 
-        const BEST_SPAWN_LIMIT = 1;        
+        const LATEST_SPAWN_LIMIT = 2;
+        const LATEST_GOOD_SPAWN_LIMIT = 1;
+        const BEST_SPAWN_LIMIT = 1;
         let spawnLog = { latest: [], latestGood: [], best: [] };
 
         function appleRank(type) { return APPLE_ORDER.indexOf(type); }
@@ -976,12 +1191,12 @@
         }
 
         function spawnApple(fG, c) {
-            if(!gameActive) return;
+            if(!gameActive || currentGameMode !== "arcade") return; // Adventure : apparitions fournies par le serveur
             for(let i=0; i<c; i++) {
                 if (currentGameMode === "arcade") {
                     let isOp = fG || Math.random() < currentLuck;
                     apples.push({ x: Math.random() * (canvas.width - 60), y: Math.random() * (canvas.height - 60), size: 25, type: isOp ? 'green' : 'red' });
-                } 
+                }
                 else if (currentGameMode === "adventure") {
                     let newType = null;
                     if (!fG) {
@@ -992,7 +1207,7 @@
                     let rng = Math.random();
                     let bloodmoonChance = 0.00000666 * luckMultiplier;
                     let darkChance = 0.001 * luckMultiplier;
-                    let salhiniChance = 0; 
+                    let salhiniChance = 0;
                     let moonyChance = 0.0001 * luckMultiplier;
                     let galaxyChance = 0.003 * luckMultiplier;
                     let lavaChance = 0.005 * luckMultiplier;
@@ -1003,12 +1218,12 @@
                     if (!fG && rng < bloodmoonChance) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 36, type: 'bloodmoon' }); showAdvancedMsg("A Bloodmoon apple spawned in your server!", 'bottom', {color: '#8b0000'}); }
                     else if (!fG && rng < (bloodmoonChance + salhiniChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'salhini' }); showAdvancedMsg("A Salhini Appelini spawned in your server!", 'bottom', {color: '#F5D7C3'}); }
                     else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'moony' }); showAdvancedMsg("A Moony Apple spawned in your server!", 'bottom', {stops: ['#BFC1C2', '#F8F8F8', '#9EA0A2', '#ECECEC']}); }
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'dark' }); } 
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'galaxy' }); } 
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'lava' }); } 
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance + candyChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'candy' }); } 
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance + candyChance + diamondChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'diamond' }); } 
-                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance + candyChance + diamondChance + goldenChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'golden' }); } 
+                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'dark' }); }
+                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'galaxy' }); }
+                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'lava' }); }
+                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance + candyChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'candy' }); }
+                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance + candyChance + diamondChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'diamond' }); }
+                    else if (!fG && rng < (bloodmoonChance + salhiniChance + moonyChance + darkChance + galaxyChance + lavaChance + candyChance + diamondChance + goldenChance)) { apples.push({ x: Math.random() * (canvas.width - 35), y: Math.random() * (canvas.height - 35), size: 32, type: 'golden' }); }
                     else {
                         let isOp = fG || Math.random() < currentLuck;
                         apples.push({ x: Math.random() * (canvas.width - 60), y: Math.random() * (canvas.height - 60), size: 25, type: isOp ? 'green' : 'red' });
@@ -1022,43 +1237,28 @@
             if(!gameActive) return; ctx.clearRect(0, 0, canvas.width, canvas.height);
             let dx = player.x - ball.x, dy = player.y - ball.y, dist = Math.sqrt(dx*dx+dy*dy);
             if(dist > 35) { ball.x += (dx/dist)*ball.speed; ball.y += (dy/dist)*ball.speed; }
-            
+
             const maxBallSpeed = Math.max(5, ball.baseSpeed); if (ball.speed > maxBallSpeed) { ball.speed = maxBallSpeed; } else if (ball.speed < 1) { ball.speed = 1; }
 
             ctx.shadowBlur = 0; ctx.shadowColor = "transparent"; ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 40px Nunito"; ctx.textAlign = "center"; 
+            ctx.font = "bold 40px Google Sans"; ctx.textAlign = "center";
             ctx.fillText("🕹️", player.x, player.y); ctx.fillText(ball.emoji, ball.x, ball.y);
-            
+
             apples = apples.filter(a => {
                 let hitBox = a.size;
-                if(Math.sqrt((ball.x-a.x)**2 + (ball.y-a.y)**2) < hitBox) {
-                    
+                if(Math.sqrt((ball.x-a.x)**2 + (ball.y-a.y)**2) < hitBox && !(currentGameMode === "adventure" && window.advHold && window.advHold())) {
+
                     if (currentGameMode === "arcade") {
                         score += (a.type === 'green' ? 3 : 1) * scoreMult; document.getElementById("score").innerText = "Score: " + fmtNum(score);
-                    } 
+                    }
                     else if(currentGameMode === "adventure") {
-                        let activeData = accounts[currentAccountName];
-                        if(activeData) {
-                            activeData.discovered = activeData.discovered || {}; activeData.discovered[a.type] = true;
-                            if(a.type === 'red') activeData.redApples += appleMultiplier;
-                            else if(a.type === 'green') activeData.greenApples += appleMultiplier;
-                            else if(a.type === 'golden') activeData.goldenApples += appleMultiplier;
-                            else if(a.type === 'diamond') activeData.diamondApples += appleMultiplier;
-                            else if(a.type === 'candy') activeData.candyApples += appleMultiplier;
-                            else if(a.type === 'lava') activeData.lavaApples = (activeData.lavaApples || 0) + appleMultiplier;
-                            else if(a.type === 'galaxy') activeData.galaxyApples = (activeData.galaxyApples || 0) + appleMultiplier;
-                            else if(a.type === 'dark') activeData.darkApples = (activeData.darkApples || 0) + appleMultiplier;
-                            else if(a.type === 'salhini') activeData.salhiniApples = (activeData.salhiniApples || 0) + appleMultiplier;
-                            else if(a.type === 'bloodmoon') activeData.bloodmoonApples = (activeData.bloodmoonApples || 0) + appleMultiplier;
-                            else if(a.type === 'moony') activeData.moonyApples = (activeData.moonyApples || 0) + appleMultiplier;
-                            else if(NEW_APPLES[a.type]) activeData[NEW_APPLES[a.type].field] = (activeData[NEW_APPLES[a.type].field] || 0) + appleMultiplier;
-                            saveAllAccounts();
-                        }
+                        // le serveur crédite la pomme à la prochaine synchro ; ici on affiche seulement le gain (firebase-trade.js)
+                        if (window.advCollect) window.advCollect(a);
                     }
 
                     return false;
                 }
-                
+
                 ctx.save();
                 if (a.type === 'salhini') {
                     ctx.shadowBlur = 20;
@@ -1078,8 +1278,8 @@
                 let imgObj = IMAGES_CACHE[a.type];
                 if (imgObj && imgObj.complete && imgObj.naturalWidth > 0) {
                     try { ctx.drawImage(imgObj, a.x - a.size/2, a.y - a.size/2, a.size, a.size); }
-                    catch (e) { ctx.font = "24px Nunito"; ctx.fillText("✨", a.x, a.y); }
-                } else { ctx.font = "24px Nunito"; ctx.fillText("✨", a.x, a.y); }
+                    catch (e) { ctx.font = "24px Google Sans"; ctx.fillText("✨", a.x, a.y); }
+                } else { ctx.font = "24px Google Sans"; ctx.fillText("✨", a.x, a.y); }
                 ctx.restore();
                 return true;
             });
@@ -1089,16 +1289,18 @@
         function countdown() {
             if(!gameActive || currentGameMode !== "arcade") return;
             if (timeLeft > 0) { timeLeft--; document.getElementById("timer-display").innerText = "Timer: " + timeLeft; setTimeout(countdown, 1000); }
-            else { 
+            else {
                 gameActive = false; if (gameSpawnInterval) { clearInterval(gameSpawnInterval); gameSpawnInterval = null; }
-                setTimeout(() => { if(confirm("Game Over! Restart?")) { startGame(); } else { leaveGame(); } }, 100); 
+                setTimeout(() => { if(confirm("Game Over! Restart?")) { startGame(); } else { leaveGame(); } }, 100);
             }
         }
 
         window.addEventListener("mousemove", (e) => { player.x = e.clientX; player.y = e.clientY; });
     </script>
 <script src="i18n.js"></script>
-<script src="GUI/witch-fuse.js"></script>
+<script src="witch-fuse.js"></script>
 <script type="module" src="firebase-trade.js"></script>
+</body>
+</html>
 </body>
 </html>

@@ -45,7 +45,7 @@ async function api(path, method = "GET", body, opts = {}) {
   const r = await fetch(API + path, { method, keepalive: !!opts.keepalive,
     headers: { Authorization: "Bearer " + token, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
   let j = {}; try { j = await r.json(); } catch (e) {}
-  if (!r.ok) { const e = new Error(j.error || "HTTP " + r.status); e.status = r.status; throw e; }
+  if (!r.ok) { if (j.error === "banned") showBan(j.banned_until, j.now); const e = new Error(j.error || "HTTP " + r.status); e.status = r.status; throw e; }
   return j;
 }
 
@@ -175,15 +175,36 @@ document.head.appendChild(warnCss);
 const warnOv = document.createElement("div"); warnOv.id = "warn-ov";
 warnOv.innerHTML = `<div id="warn-box"></div>`;
 document.body.appendChild(warnOv);
-warnOv.addEventListener("mousedown", e => { if (e.target === warnOv) warnOv.style.display = "none"; }); // clic en dehors = ferme
+warnOv.addEventListener("mousedown", e => { if (e.target === warnOv && !banUntil) warnOv.style.display = "none"; }); // clic en dehors = ferme (impossible pendant un ban)
 const WLOGO = "https://raw.githubusercontent.com/FastCollectChallenge/play/main/Fast%20Collect%20Challenge%20NBG%20logo.png";
 const WNAME = `<span class="wn"><img src="${WLOGO}" alt="">Fast Collect Challenge</span>`;
 let lastWarn = 0;
-function warnCheater() {
+let banUntil = 0, banTimer = null, srvOff = 0;
+function fmtLeft(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return String(Math.floor(s / 3600)).padStart(2, "0") + ":" + String(Math.floor(s % 3600 / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+function showBan(until, now) {
+  banUntil = until; srvOff = now ? now - Date.now() : srvOff;
+  advStop(false);
+  $("warn-box").innerHTML = `<div class="wt">You got temporarily banned from ${WNAME}</div><div class="wx" id="ban-left"></div>`;
+  warnOv.style.display = "flex";
+  clearInterval(banTimer);
+  const tick = () => {
+    const left = banUntil - (Date.now() + srvOff);
+    if (left <= 0) { clearInterval(banTimer); banUntil = 0; location.reload(); return; }
+    $("ban-left").textContent = fmtLeft(left);
+  };
+  tick(); banTimer = setInterval(tick, 1000);
+}
+
+async function warnCheater() {
   if (!me || Date.now() - lastWarn < 10000) return; // une seule alerte à la fois
   lastWarn = Date.now();
-  const k = "fc_warn_" + me; let n = 0;
-  try { n = (+localStorage.getItem(k) || 0) + 1; localStorage.setItem(k, n); } catch (e) { n = 1; }
+  if (banUntil) return;
+  let r; try { r = await api("/warn", "POST", {}); } catch (e) { return; }
+  if (r.banned_until) return showBan(r.banned_until, r.now);
+  const n = r.warnings;
   const box = $("warn-box");
   if (n === 1) box.innerHTML = `<div class="wt">You got your first warning.</div><div class="wb">${WNAME} does not approve of cheaters, just thought you ought to know.</div>`;
   else box.innerHTML = `<div class="wt">You just got your last chance.</div><div class="wb">We already told you that ${WNAME} does not approve of cheaters, but you don't seem to understand.</div><div class="wx">Next time it's going to be a ban</div>`;
@@ -210,16 +231,12 @@ setInterval(() => {
 
 window.advHold = () => adv.rolling; // pendant le changement de paquet, on ne ramasse pas (index.html)
 window.advCollect = a => {
-  window.advCollect = a => {
-  if (a.idx == null) { warnCheater(); return; }   // pomme sans token = pomme fabriquée
+  if (a.idx == null) { warnCheater(); return; } // pomme sans token = pomme fabriquée
   if (!adv.on || a.advSeq !== adv.seq || adv.bits[a.idx]) return;
-  // ... le reste ne change pas
-  if (!adv.on || a.advSeq !== adv.seq || a.idx == null || adv.bits[a.idx]) return;
   adv.bits[a.idx] = true; adv.unsent.push(a.type);
   const d = acc(); if (d) credit(d, a.type);
   snap();
   updateAdventureHUD();
-  }
 };
 window.advStart = async function () {
   advStop(false);
@@ -732,6 +749,7 @@ onAuthStateChanged(auth, async user => {
   manualLogout = false;
   let v;
   try { v = await ensureProfile(user); if (!v) return; } catch (e) { err(e); ov.style.display = "flex"; return; }
+  if (v.banned_until) { srv.offset = v.now - Date.now(); showBan(v.banned_until, v.now); return; }
   me = user.uid; srv.offset = v.now - Date.now();
   try { applyRemote(v); ov.style.display = "none"; boot.style.display = "none"; promptOneTap(); } catch (e) { err(e); console.error(e); }
 });
